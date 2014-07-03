@@ -1,16 +1,18 @@
 function fe = s_fe_fit()
 %
 % This function:
-%  - Initializes a LIFE structure from a candidate connectome
-%  - Generates an optimized connectome from a cadidate connectome using 
+%  - Identifies al the fibers between two ROIs from a whole-brain conenctome
+%  - Combines them with fibers tracted between the two ROIs 
+%  - Generates an optimized connectome from a candidate connectome using 
 %  LIFE method
+%  - Performs a virtual lesion
 %
 %  fe = s_fe_fit()
 % 
 % INPUTS:  none
 % OUTPUTS: fe structure the optimized life structure
 %
-% Copyright Franco Pestilli (2013) Vistasoft Stanford University.
+% Copyright Franco Pestilli (2014) Stanford University.
 
 %% Get the base directory for the data
 datapath = pestilliDataPath;

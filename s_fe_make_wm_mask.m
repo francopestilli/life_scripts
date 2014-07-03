@@ -18,10 +18,6 @@ subjects = {...
     'MP_96dirs_b2000_1p5iso', ...
     };
 
-if notDefined('saveDir'),      savedir      = fullfile(datapath,'anatomy');end
-if notDefined('trackingType'), trackingType = 'lmax10';end
-if notDefined('hemisphere'),   hemisphere   = {'left','right'};end
-if notDefined('plotAnatomy'),  plotAnatomy  = 0;end
 md_percentile = 95;
 
 for isbj = 1:length(subjects)

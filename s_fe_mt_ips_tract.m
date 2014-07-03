@@ -1,16 +1,15 @@
-function s_fe_mt_ips_tract(hemisphere,saveDir)
+function s_fe_mt_ips_tract(hemisphere)
 %
-% This script performs a test of conenctivity of MT+ (LO1 and LO2) with
-% IPS0. THe following are the steps we perform:
-%  - It loads a culled half hemisphere connectome (FE structure). 
-%  - It loads the MT+ ROI.
-%  - It loads the IPS0 ROI. 
-%  - It finds the fascicles connecting MT+ and IPS0
-%  - It reduces the connectome to the voxels and fibers of the conenctions
-%  - It Perform a bootstrap test WITH and WITHOUT the connection between
-%    MT+ and IPS0.
+% This script performs a test of conenctivity of MT+ (Zilles t al ROI from 
+% freesurfer) with the Superior parietal Cortex (Aparc Freesurfer segementation). 
+% The following are the steps we perform:
+%  - It loads a whole-brain tractography solution. 
+%  - It loads the MTand Parietal ROI. 
+%  - It finds the tract connecting the two ROIs.
+%  - It builds a connectome model in the ROI defined by the tract
+%  - It performs a virtual lesion on the tract connecting MT and parietal.
 %
-% Written by Franco Pestilli (c) Stanford University, Vista Team 2013
+% Copyright by Franco Pestilli Stanford University, 2014
 
 % Handle parallel computing
 if matlabpool('size') == 0
@@ -20,42 +19,55 @@ if matlabpool('size') == 0
 end
 % Get the base directory for the data
 datapath = '/marcovaldo/frk/2t1/predator/';
-subjects = {...   
-    'KK_96dirs_b2000_1p5iso', ...
-    'JW_96dirs_b2000_1p5iso', ... 
-    'HT_96dirs_b2000_1p5iso', ...
-    'KW_96dirs_b2000_1p5iso', ...
+subjects = {...
     'FP_96dirs_b2000_1p5iso', ...
     'MP_96dirs_b2000_1p5iso', ...
+    'KK_96dirs_b2000_1p5iso', ...
+    'JW_96dirs_b2000_1p5iso', ...
+    'HT_96dirs_b2000_1p5iso', ...
+    'KW_96dirs_b2000_1p5iso', ...
     };
 
 if notDefined('saveDir'), savedir = fullfile('/marcovaldo/frk/Dropbox','pestilli_etal_revision',mfilename);end
 if notDefined('trackingType'), trackingType = 'lmax10';end
 if notDefined('hemisphere'), hemisphere = {'left','right'};end
-if notDefined('plotAnatomy'), plotAnatomy = 0;end
-
-% Logical operation to perform ith each ROI
-roi_operations   = {'and','and'};
-
-for iSbj = 1
-% Load the
-t1File = fullfile(datapath,subjects{isbj},'/t1/t1.nii.gz');
-
+if notDefined('plotAnatomy'), plotAnatomy = true;end
+anatomyPath     = '/dev/data/anatomy/';
+parietalRoiName = 'lh_MT_label_smooth3mm.nii.gz';
+mtRoiName       = 'rh_MT_label_smooth3mm.nii.gz';
+parietalRoiName = 'lh_superiorparietal_label_smooth3mm.nii.gz';
+mtRoiName       = 'rh_superiorparietal_label_smooth3mm.nii.gz';
+            
+for iSbj = 1:length(subjects)
 % Load the FE structure
-saveDir         = fullfile(savedir,subjects{isbj});
-connectomesPath = fullfile(datapath,subjects{isbj},'connectomes');
-feFileToLoad    = dir(fullfile(connectomesPath,sprintf('*%s*.mat',trackingType)));
-fname           = feFileToLoad(probIndex).name(1:end-4);
-feFileToLoad    = fullfile(connectomesPath,fname);
-fprintf('[%s] Loading: \n%s\n ======================================== \n\n',mfilename,feFileToLoad)
-load(feFileToLoad);
+saveDir         = fullfile(savedir,subjects{iSbj});
+fibergroupPath  = fullfile(datapath,subjects{iSbj},'fibers');
+fgFileToLoad    = dir(fullfile(fibergroupPath,sprintf('*%s*.pdb',trackingType)));
+fname           = fgFileToLoad(1).name;
+fgFileToLoad    = fullfile(fibergroupPath,fname);
+fgFileToLoad1   = dir(fullfile(fibergroupPath,sprintf('*%s*.pdb','lmax8')));
+fname1          = fgFileToLoad1(1).name;
+fgFileToLoad1   = fullfile(fibergroupPath,fname1);
+fgFileToLoad2   = dir(fullfile(fibergroupPath,sprintf('*%s*.pdb','lmax2')));
+fname2          = fgFileToLoad2(1).name;
+fgFileToLoad2   = fullfile(fibergroupPath,fname2);
 
 for ih = 1:length(hemisphere)
+    if matlabpool('size') == 0
+        c = parcluster;
+        c.NumWorkers = 12;
+        matlabpool(c);
+    end
+    fprintf('[%s] Loading: \n%s\n ======================================== \n\n',mfilename,fgFileToLoad)
+    fg = fgRead(fgFileToLoad);
+    fg = fgMerge(fg,fgRead(fgFileToLoad1));
+    fg = fgMerge(fg,fgRead(fgFileToLoad2));
+
     % Set all the variables that depend on the hemisphere
     switch hemisphere{ih}
         case {'left'}
-            ipsRoi     = 'LIPS0_cleaned.mat';
-            mtRoi      = 'LTO1_O2_cleaned.mat';
+            parietalRoiName = 'lh_superiorparietal_label_smooth3mm.nii.gz';
+            mtRoiName       = 'lh_MT_label_smooth3mm.nii.gz';
             axisLims   = [-67 -18 -110 -40 -18 80];
             vw         = [-75,30];
             slices     = {[-18 0 0],[0 -40 0],[0 0 -14 ]};
@@ -65,8 +77,8 @@ for ih = 1:length(hemisphere)
             histcolor{2}  = [.6 0.4 0.4];
             
         case {'right'}
-            ipsRoi     = 'RIPS0_cleaned.mat';
-            mtRoi      = 'RTO1_O2_cleaned.mat';
+            parietalRoiName = 'rh_superiorparietal_label_smooth3mm.nii.gz';
+            mtRoiName       = 'rh_MT_label_smooth3mm.nii.gz';
             axisLims   = [18 67 -110 -40 -18 80];
             vw         = [75,30];
             slices     = {[18 0 0],[0 -40 0],[0 0 -14 ]};
@@ -79,77 +91,113 @@ for ih = 1:length(hemisphere)
             keyboard
     end
     
-    % Load the ROIs
-    roiDir       = fullfile(datapath,subjects{isbj},'rois');
-    mtFileName   = fullfile(roiDir,mtRoi);
-    ips0FileName = fullfile(roiDir,ipsRoi);
+    % Load the ROIs  
+    FS_SUBJECT       = matchSubject2FSSUBJ(subjects{iSbj});
+    roiDir           = fullfile(anatomyPath,FS_SUBJECT,'label');
+    mtFileName       = fullfile(roiDir,mtRoiName);
+    parietalFileName = fullfile(roiDir,parietalRoiName);
     
-    % Find the fascicles in the connectome that touch both MT+ and IPS0.
-    mt   = dtiReadRoi(mtFileName);
-    ips0 = dtiReadRoi(ips0FileName);
-    rois = {mt,ips0};
-    fg   = feGet(fe,'fg acpc');
-    [mtIpsFG, keepFascicles] = feSegmentFascicleFromConnectome(fg, rois, roi_operations, 'mt_ips_zero');
+    % Find the fascicles in the connectome that touch both MT+ and parietal.
+    mt       = dtiImportRoiFromNifti(mtFileName,[parietalFileName(1:end-7),'_ROI.mat']);
+    parietal = dtiImportRoiFromNifti(parietalFileName,[parietalFileName(1:end-7),'_ROI.mat']);
+    tic, fprintf('\n[%s] Segmenting tract from connectome... \n',mfilename)
+    [mt2parietalTract, ~] = feSegmentFascicleFromConnectome(fg, {mt,parietal}, {'endpoints','endpoints'}, 'mt_parietal');
     
     % Clean the fibers by length, fibers that too long are likely to go far
-    % frontal and not just touch MT+ and IPS0.
-    [Lnorm, Lmm]   = mbaComputeFiberLengthDistribution(mtIpsFG, false);
-    maxSD          = 1; % Max standard deviation of the fibers to keep in the group.
-    fibers2delete  = Lnorm > maxSD;
+    % frontal and not just touch MT+ and parietal.
+    [~, keep]        = mbaComputeFibersOutliers(mt2parietalTract,3,3);  
+    fprintf('\n[%s] Found a tract with %i fibers... \n',mfilename,sum(keep))
+    mt2parietalTract = fgExtract(mt2parietalTract,find(keep),'keep');
+    toc
     
-    % Now let's get the indices of the fibers in the FE structure:
-    fasIndices = find(keepFascicles);
-    fasIndices = fasIndices(fibers2delete);
+    % Find the Coordinates of the mt-parietal tract
+    tic, fprintf('\n[%s] Create ROI from MT-Parietal tract... \n',mfilename)
+    tractRoi = dtiCreateRoiFromFibers(mt2parietalTract);
+    %tractRoi = dtiRoiClean(tractRoi, 12, 'dilate');toc % We smooth the ROI to enlarge the pathneighborhod fibers for visualization
+
+    tic, fprintf('\n[%s] Removing fibers not going throught the tractROI... \n',mfilename)
+    [fg,~, ~, ~] = dtiIntersectFibersWithRoi([],'and',2,tractRoi,fg);
+    fg = feClipFibersToVolume(fg,tractRoi.coords,1);toc
     
-    % Now let's mark the fascicles as deleted.
-    keepFascicles(fasIndices) = false;
+    % Build LiFE model only in this volume, fit, cull
+    dwiPath  = fullfile(datapath,subjects{iSbj},'diffusion_data');
+    dwiFiles = dir(fullfile(dwiPath,sprintf('run*.gz')));
+    dwiFile       = fullfile(dwiPath,dwiFiles(1).name);
+    dwiFileRepeat = fullfile(dwiPath,dwiFiles(2).name);
+    t1File        = fullfile(datapath,subjects{iSbj},'anatomy','t1.nii.gz');
     
-    % Perform a virtual lesion: MT+ and IPS0.
-    [S, fh] = feVirtualLesion(fe,keepFascicles,0);
-    figName = sprintf('virtual_lesion_distributions_%s',trackingType);
-    saveFig(fh,fullfile(saveDir,figName),'eps')
+    % Directory where to save the fe structures
+    saveDirC   = fullfile(datapath,subjects{iSbj},'connectomes');
+    feFileName = [parietal.name, '_', fname(1:40), '.mat'];
+    fe   = feConnectomeInit(dwiFile,fg,feFileName,saveDirC,dwiFileRepeat,t1File);
+    M    = feGet(fe,'mfiber');
+    dSig = feGet(fe,'dsigdemeaned');
+    fit  = feFitModel(M,dSig,'bbnnls');
+    fe   = feSet(fe,'fit',fit);clear fit
+    fg   = feGet(fe,'fibers acpc');
+    [~, keepFascicles] = feSegmentFascicleFromConnectome(fg, {mt,parietal}, {'endpoints','endpoints'}, 'mt_parietal');
     
-    if plotAnatomy
-        slice  = {[0 -56 0],[0 -58 0],[0 -60 0],[0 -62 0],[0 -64 0], ...
-                  [0 -66 0],[0 -68 0],[0 -70 0],[0 -72 0],[0 -74 0]};
-              
+    % Perform a virtual lesion: MT+ and parietal.
+    display.tract = true;
+    display.distributions = true;
+    display.evidence = true;
+    [SE(iSbj,ih), fig] = feVirtualLesion(fe,keepFascicles,display);    
+    clear fe
+    saveFig(fig(1).fh,fullfile(saveDir,[fig(1).name, '_',hemisphere{ih}]),'eps')
+    saveFig(fig(2).fh,fullfile(saveDir,[fig(2).name(1:end-4), '_',hemisphere{ih}]),'eps')   
+    if plotAnatomy             
         % Load the T1 file for display
         t1     = niftiRead(t1File);
         
-        for iS = 1:length(slice)
-            % Make a figure of brain slice of the RMSE with the fascicle
-            figName = sprintf('rmse_map_UNLESIONED_%s_slice%i_%s',feFileName(1:end-4),slice{iS}(find(slice{iS})),hemisphere{ih});
-            shW = makeBrainMap(feWithFas,t1,slice{iS},SLaxLims,figName,saveDir);
-            
-            % Make a figure of brain slice of the RMSE without the fascicle
-            figName = sprintf('rmse_map_LESIONED_%s_slice%i_%s',feFileName(1:end-4),slice{iS}(find(slice{iS})),hemisphere{ih});
-            shWO = makeBrainMap(feWithoutFas,t1,slice{iS},SLaxLims,figName,saveDir);
-        end
-        
+        for ifs = 5:-1:3
         % Show te new fiber group
-        mtIpsFG = fgExtract(mtIpsFG,Lnorm < maxSD,'keep');
-        figName = sprintf('MT_IPS0_connection_anatomy_%s_%s',hemisphere{ih},feFileName(1:end-4));
-        figureHandle = mrvNewGraphWin(figName);
+        figure(fig(ifs).fh); hold on
         h  = mbaDisplayBrainSlice(t1, slices{1});
-        hold on
         h  = mbaDisplayBrainSlice(t1, slices{2});
         h  = mbaDisplayBrainSlice(t1, slices{3});
-        tractColor = [.8 .6 .2];%[.3 .7 .9];
-        [figureHandle, lightHandle, sHandle] = mbaDisplayConnectome(mtIpsFG.fibers,figureHandle,tractColor,'uniform');
-        delete(lightHandle)
-        view(vw(1),vw(2));
-        axis(axisLims);
-        lightHandle = camlight(lght);
-        set(gcf,'Position',[0.0148 0.0148 .35 .87])
-        drawnow
-        saveFig(figureHandle,fullfile(saveDir,figName),'jpg')
+        view(vw(1),vw(2)); axis(axisLims);
+        %set(gcf,'Position',[0.0148 0.0148 .35 .87])
+        saveFig(fig(ifs).fh,fullfile(saveDir,[fig(ifs).name, '_',hemisphere{ih}]),'jpg')
+        close(fig(ifs).fh); drawnow
+        end
     end
+    close all
+    matlabpool close force local
 end
 end
+tic, fprintf('\n[%s] Saving results of virtual lesion... \n',mfilename)
+save(fullfile(savedir,'strength_of_evidence.mat'),'SE'); toc
 
 end % Main function
 
 %%%%%%%%%%%%%%%%%%%%%%%
+function FS_SUBJECT = matchSubject2FSSUBJ(subject)
+
+switch subject
+    case {'FP_96dirs_b2000_1p5iso'}
+        FS_SUBJECT = 'pestilli_test';
+        
+    case {'KW_96dirs_b2000_1p5iso'}
+        FS_SUBJECT = 'weiner';
+        
+    case {'MP_96dirs_b2000_1p5iso'}
+        FS_SUBJECT = 'lmperry';
+        
+    case {'HT_96dirs_b2000_1p5iso'}
+        FS_SUBJECT = 'takemura';
+        
+    case {'JW_96dirs_b2000_1p5iso'}
+        FS_SUBJECT = 'winawer';
+        
+    case {'KK_96dirs_b2000_1p5iso'}
+        FS_SUBJECT = 'knk';
+        
+    otherwise
+        keyboard
+end
+end
+
+
 function [fh,sh] = makeBrainMap(fe,t1,slice,axLims,figName,saveDir)
 
 % Make a map of the RMSE WITH and WITHOUT the fascicle:
@@ -221,15 +269,15 @@ if ~isempty(message), disp(sprintf('%s.',message));end
 % Find out which type of figure and geenerate the proper printing command.
 switch type
     case {0,'jpeg','jpg'}
-        printCommand = (sprintf('print(%s, ''-djpeg90'',''-r500'' , ''-noui'', ''-opengl'', ''%s'')', num2str(h),figName));
+        printCommand = (sprintf('print(%s, ''-djpeg80'',''-r300'' , ''-noui'', ''-opengl'', ''%s'')', num2str(h),figName));
     case {1,'eps'}
-        printCommand = (sprintf('print(%s, ''-cmyk'', ''-depsc2'',''-tiff'',''-r500'' , ''-noui'', ''%s'')', num2str(h),figName));
+        printCommand = (sprintf('print(%s, ''-cmyk'', ''-depsc2'',''-tiff'',''-r300'' , ''-noui'', ''%s'')', num2str(h),figName));
     case 'png'
-        printCommand =  (sprintf('print(%s, ''-dpng'',''-r500'', ''%s'')', num2str(h),figName));
+        printCommand =  (sprintf('print(%s, ''-dpng'',''-r300'', ''%s'')', num2str(h),figName));
     case 'tiff'
-        printCommand = (sprintf('print(%s, ''-dtiff'',''-r500'', ''%s'')', num2str(h),figName));
+        printCommand = (sprintf('print(%s, ''-dtiff'',''-r300'', ''%s'')', num2str(h),figName));
     case 'bmp'
-        printCommand = (sprintf('print(%s, ''-dbmp256'',''-r500'', ''%s'')', num2str(h),figName));
+        printCommand = (sprintf('print(%s, ''-dbmp256'',''-r300'', ''%s'')', num2str(h),figName));
     otherwise
         keyboard
 end

@@ -13,22 +13,23 @@ function s_fe_make_mt_ips_rois(hemisphere)
 
 % Get the base directory for the data
 subjects = {...   
-    '105115', ...
-    '110411', ...
-    '111312', ...
-    '113619', ...
-    '115320', ...
-    '117122', ...
-    '118730',...
+      'FP_96dirs_b2000_1p5iso', ...
+      'KW_96dirs_b2000_1p5iso', ...
+      'MP_96dirs_b2000_1p5iso', ...
+      'HT_96dirs_b2000_1p5iso', ...
+      'JW_96dirs_b2000_1p5iso', ...
+      'KK_96dirs_b2000_1p5iso' ...
     };
 
 if notDefined('hemisphere'), hemisphere = {'lh','rh'};end
-annotationFileName = {'aparc','aparc.a2009s'};
+if notDefined('annotationFileName')
+    annotationFileName = {'aparc','aparc.a2009s'};
+end
 labelFileName =  {'superiorparietal','MT'};
 fsSubjectsDir = getenv('SUBJECTS_DIR');
 
-for iSbj = 1:length(subjects)
-    if ~isdir(fullfile(fsSubjectsDir))
+for iSbj = 2%1:length(subjects)
+    if ~isdir(fullfile(fsSubjectsDir,subjects{iSbj}))
          fs_subject = matchSubject2FSSUBJ(subjects{iSbj});
     else fs_subject = subjects{iSbj};
     end
@@ -36,7 +37,7 @@ for iSbj = 1:length(subjects)
 
     % Create all the necessary label files
     for ia = 1:length(annotationFileName)
-        fs_annotationToLabelFiles(fs_subject,annotationFileName{ia});
+        fs_annotationToLabelFiles(fs_subject,annotationFileName{ia},[],fsSubjectsDir);
     end
     
     % Extract the label files for the ROI we want and make nifti ROIs
@@ -47,7 +48,8 @@ for iSbj = 1:length(subjects)
             niftiRoiName  = labelRoiName;
             niftiRoiName(niftiRoiName=='.') = '_';
             niftiRoiFullPath  = fullfile(fsSubjectDir,'label',  niftiRoiName);
-            fs_labelFileToNiftiRoi(fs_subject,labelRoiName,niftiRoiFullPath,hemisphere{ih});
+            fs_labelFileToNiftiRoi(fs_subject,labelRoiName,niftiRoiFullPath,hemisphere{ih},[],[],fsSubjectsDir);
+                
         end
     end
 end
@@ -59,16 +61,21 @@ function FS_SUBJECT = matchSubject2FSSUBJ(subject)
 switch subject
     case {'FP_96dirs_b2000_1p5iso'}
         FS_SUBJECT = 'pestilli_test';
-    case {'105115'}
-        FS_SUBJECT = '105115';
-
+        
     case {'KW_96dirs_b2000_1p5iso'}
+        FS_SUBJECT = 'weiner';
         
     case {'MP_96dirs_b2000_1p5iso'}
+        FS_SUBJECT = 'lmperry';
         
     case {'HT_96dirs_b2000_1p5iso'}
+        FS_SUBJECT = 'takemura';
         
-    case {'JW_96dirs_b2000_1p5iso'} 
+    case {'JW_96dirs_b2000_1p5iso'}
+        FS_SUBJECT = 'winawer';
+        
+    case {'KK_96dirs_b2000_1p5iso'}
+        FS_SUBJECT = 'knk';
         
     otherwise
         keyboard

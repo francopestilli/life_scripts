@@ -26,20 +26,13 @@ for ii = 1:length(fg_truth.fibers)
 end
 
 % Load some tracking fibers:
-fg_prob_path = fullfile(baseDir,'tracking','csd_prob_streamline_0.2th.trk');
+fg_prob_path = fullfile(baseDir,'tracking','csd_prob_track_ground_truth_endpoints.trk');
 fg_prob = read_trk_to_fg(fg_prob_path);
 xform = [[eye(3); 0 0 0]'; b0.qto_xyz(:,end)']';
 fg_prob_acpc = dtiXformFiberCoords(fg_prob, xform);
 
 % Add the group truth
-fg = fgMerge(fg_prob_acpc,fg_truth);
-
-% Render fibers and data
-%mbaDisplayBrainSlice(b0,[0 0 1])
-%hold on
-mbaDisplayConnectome(fg.fibers,figure)
-hold on
-mbaDisplayBrainSlice(b0,[0 0 1]);
+%fg = fgMerge(fg_prob_acpc,fg_truth);
 
 %% LiFE
 if ~exist(saveDir,'dir'), mkdir(saveDir);end
@@ -48,20 +41,52 @@ if ~exist(saveDir,'dir'), mkdir(saveDir);end
 feOpenLocalCluster;
 
 % Initialize the Connectome
-fe = feConnectomeInit(dwi_path,fg,feFileName,saveDir,dwi_path2);
+fe = feConnectomeInit(dwi_path,fg_prob_acpc,feFileName,saveDir,dwi_path2);
+if cull == 1
+    feC = feConnectomeCull(fe);
+    w = feGet(feC,'fiberweights');
+    fgCulled = feGet(feC,'fibers acpc');
+    fgCulled = fgExtract(fgCulled,find(w > 10^-4));
+else
+    M = feGet(fe,'mfiber'); % get the life model out
+    dsig = feGet(fe,'dsigdemeaned'); % Get the diffusion signal
+    
+    % Fit the model and cull. This will take some time...
+    fefit = feFitModel(M,dsig,'bbnnls');
+    fe    = feSet(fe,'fit',fefit);
+    w     = feGet(fe,'fiberweights');
+    fgCulled = fgExtract(fg_prob_acpc,find(w > 0));
+end
 
-M = feGet(fe,'mfiber'); % get the life model out 
-dsig = feGet(fe,'dsigdemeaned'); % Get the diffusion signal
+% Render original fibers and data
+fh = figure('name','original fibers','color','k');
+mbaDisplayConnectome(fg_prob_acpc.fibers,fh,[.9 .4 .2],'single',[], [], .44);
+hold on
+mbaDisplayBrainSlice(b0,[0 0 1], [], [],.4);
 
-% Fit the model and cull. This will take some time...
-fefit = feFitModel(M,dsig,'bbnnls');
-fe    = feSet(fe,'fit',fefit);
+% Render culled fibers and data
+fh = figure('name','optimized fibers','color','k');
+mbaDisplayConnectome(fgCulled.fibers,fh,[.2 .6 .9],'single',[], [], .44);
+hold on
+mbaDisplayBrainSlice(b0,[0 0 1], [], [],.4);
 
-% Save it
-%feConnectomeSave(fe);
+fh = figure('name','dwi signal','color','k');
+mbaDisplayBrainSlice(b0,[0 0 2], [], [],1);
+view(0,90);
+box off;axis off;
+set(gcf,'Color',[0 0 0]);
+set(gca,'color',[0 0 0])
+hold off;
+set(fh, ...
+    'Units','normalized', ...
+    'Position', [0 0.2 0.2 0.4], ...
+    'DoubleBuffer', 'on', ...
+    'Color',[0 0 0]);
+daspect ([ 1 1 1 ]);
+
+save('fiber_cup_life_results.mat','fe','feC')
 
 %% Make a plot of the weights:
-w = feGet(fe,'fiber weights');
 figName = sprintf('Fascicle weights');
 mrvNewGraphWin(figName);
 [y,x] = hist(w(w > 0),logspace(-4,-.3,50));
@@ -108,10 +133,6 @@ ylabel('number of voxels','fontsize',16)
 xlabel('R2','fontsize',16)
 legend({'R2 fitted data set','R2 cross-validated'},'fontsize',16)
 
-%% Visualize fibers colored based on weight
-fgGood = fgExtract(fg,w > 0,'keep');
-mbaDisplayConnectome(fgGood.fibers,figure)
-hold on
-mbaDisplayBrainSlice(b0,[0 0 1]);
+
 
 keyboard

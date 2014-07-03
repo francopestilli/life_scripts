@@ -10,12 +10,12 @@ function s_fe_weights_hcp(bval,tractographyType)
 % Copyright Franco Pestilli (2014) Stanford University
 
 % Get the base directory for the data
-datapath = '/home/frk/2t2/HCP/';
-subjects = {'115320','117122','118730'};
+datapath = '/marcovaldo/frk/2t2/HCP/';
+subjects = {'105115','110411','111312','113619','115320','117122','118730'};
         
 if notDefined('tractographyType'), tractographyType = 'lmax10'; end
-if notDefined('bval'), bval = []; end
-if notDefined('saveDir'), saveDir = fullfile('/home/frk/Dropbox','pestilli_etal_revision',mfilename);end
+if notDefined('bval'), bval = 2000; end
+if notDefined('saveDir'), saveDir = fullfile('/marcovaldo/frk/Dropbox','pestilli_etal_revision',mfilename);end
 
 % These are default parameters for plotting
 nBins = 11; % first bin is zero weight second is
@@ -25,11 +25,16 @@ w = cell(1,length(subjects));
 len = w;
 for isbj = 1:length(subjects)
     % Directory where to load the results
+    if isbj <= 4
+       datapath = '/marcovaldo/frk/2t1/HCP/';
+    else
+        datapath = '/marcovaldo/frk/2t2/HCP/';
+    end
     resultsPath  = fullfile(datapath,subjects{isbj},'results');
     savedir      = fullfile(saveDir,subjects{isbj});
 
     if ~isempty(bval)
-       resFiles       = dir(fullfile(resultsPath,sprintf('*%s*%s*right*.mat',num2str(bval),tractographyType)));
+       resFiles       = dir(fullfile(resultsPath,sprintf('*%s*%s*cerebellum*.mat',num2str(bval),tractographyType)));
     else
        resFiles       = dir(fullfile(resultsPath,sprintf('*%s*right*.mat',tractographyType)));
     end
@@ -54,19 +59,19 @@ for isbj = 1:length(subjects)
 
         % Distribution of length
         [f, ol(isbj,:), cl(isbj,:), lbins] = plotLengthHist(tractographyType,olen{isbj},clen{isbj});
-        feSavefig(f,'verbose','yes','figName',[resFileName, '_optimized_fiberlength_hist'],'figDir',savedir,'figType','eps');
+        feSavefig(f,'verbose','yes','figName',[resFileName, 'cereb_optimized_fiberlength_hist'],'figDir',savedir,'figType','eps');
         close(f)
                     
         % Proportion of deleted fibers at each fiber length
-        ratioLength = ol./cl;
-        drl = mean(ratioLength,1);
+        rl = ol(isbj,:)./cl(isbj,:);
+        drl = nanmean(rl,1);
         f = plotLengthRatioHist(tractographyType,drl,lbins);
-        feSavefig(f,'verbose','yes','figName',[resFileName, '_length_ratio_hist'],'figDir',savedir,'figType','eps');
+        feSavefig(f,'verbose','yes','figName',[resFileName, 'cereb_length_ratio_hist'],'figDir',savedir,'figType','eps');
         close(f)
         
         % Distribution of weights
         [f, ow(isbj,:), wbins] = plotWeightsHist(tractographyType,w{isbj});
-        feSavefig(f,'verbose','yes','figName',[resFileName, '_optimized_weight_hist'],'figDir',savedir,'figType','eps');
+        feSavefig(f,'verbose','yes','figName',[resFileName, 'cereb_optimized_weight_hist'],'figDir',savedir,'figType','eps');
         close(f)
 
         % 2d histogram
@@ -83,7 +88,7 @@ for isbj = 1:length(subjects)
         % Save the proportion of zero-weight and non-zero-weight fibers
         proportionDeleted(isbj,:) = [results.candidate.n - results.optimized.n  results.optimized.n]./results.candidate.n;
         [f, h] = plotFiberPie(resFileName,proportionDeleted(isbj,:));
-        feSavefig(f,'verbose','yes','figName',[resFileName, '_pie'],'figDir',savedir,'figType','eps');
+        feSavefig(f,'verbose','yes','figName',[resFileName, 'cereb_pie'],'figDir',savedir,'figType','eps');
         close(f)
 
 
@@ -93,19 +98,26 @@ end
 mow = mean(ow,1);
 owerr = [mow;mow]+[-std(ow)./sqrt(size(ow,1));std(ow)./sqrt(size(ow,1))];
 f = plotMeanWeightsHist(tractographyType,mow,owerr,wbins);
-feSavefig(f,'verbose','yes','figName',[resFileName, '_pie_weights'],'figDir',saveDir,'figType','eps');
+feSavefig(f,'verbose','yes','figName',[resFileName, 'cereb_pie_weights'],'figDir',saveDir,'figType','eps');
 close(f)
 
-mol = mean(ol,1);
+mol = 2*mean(ol,1);
 olerr = [mol;mol]+[-std(ol)./sqrt(size(ow,1));std(ol)./sqrt(size(ow,1))];
-mcl = mean(cl,1);
+mcl = 2*mean(cl,1);
 clerr = [mcl;mcl]+[-std(cl)./sqrt(size(ow,1));std(cl)./sqrt(size(ow,1))];
 f = plotMeanLengthHist(tractographyType,mol,olerr,mcl,clerr,lbins);
-feSavefig(f,'verbose','yes','figName',[resFileName, '_pie_length'],'figDir',saveDir,'figType','eps');
+feSavefig(f,'verbose','yes','figName',[resFileName, 'cereb_hist_length'],'figDir',saveDir,'figType','eps');
 close(f)
 
 [f, h] = plotProportionDeleted(tractographyType,proportionDeleted);
-feSavefig(f,'verbose','yes','figName',['mean_',tractographyType, '_deleted_fibers_across_subjects'],'figDir',saveDir,'figType','eps');
+feSavefig(f,'verbose','yes','figName',['mean_',tractographyType, 'cereb_deleted_fibers_across_subjects'],'figDir',saveDir,'figType','eps');
+close(f)
+
+ratioLength = ol./cl;
+drl = nanmean(ratioLength,1);
+drlerr = 10.^(log10([drl;drl])+[-nanstd(ratioLength)./sqrt(size(ratioLength,1));nanstd(ratioLength)./sqrt(size(ratioLength,1))]);
+f = plotMeanLengthRatioHist(tractographyType,drl,drlerr,lbins);
+feSavefig(f,'verbose','yes','figName',[tractographyType, 'cereb_length_ratio_hist_across_subjects'],'figDir',fullfile(saveDir,'averages'),'figType','eps');
 close(f)
 
 % [f, h] = plotLengthWeightScatter(['_ACROSS_FIVE_SUBJECTS_',tractographyType],cell2mat(w)',cell2mat(len)');
@@ -116,6 +128,26 @@ close(f)
 
 end % End main function
 
+function f = plotMeanLengthRatioHist(tractographyType,drl,drlerr,bins)
+fontSiz = 15;
+% Make a 2D histogram (scatter plot) of the percent deleted and kept fibers
+f = figure('name',sprintf('mean_length_ratio_hist_%s',tractographyType),'color','w');
+sh = plot([bins;bins],drlerr,'-','color','r','linewidth',2);
+hold on
+sh = plot(bins,(drl),'-','color','k','markeredgecolor','w','markerfacecolor','k','markersize',12);
+ylabel('Proportion deleted fascicles','fontsize',fontSiz)
+xlabel('Fascicle length','fontsize',fontSiz)
+set(gca,    'ylim',    [0.125/8 .6], ...
+    'ytick',[0.125/8 0.125/4 0.125/2 0.125 0.25 0.5], ...
+    'xlim',[bins(1) bins(end)],...
+    'xtick',[bins(1) 8 32 128  bins(end)],...
+    'yscale','log', ... 
+    'xscale','log', ...
+    'tickdir','out','box','off', ...
+    'fontsize',fontSiz,'visible','on')
+
+end
+
 function f = plotLengthRatioHist(tractographyType,drl,bins)
 fontSiz = 15;
 % Make a 2D histogram (scatter plot) of the percent deleted and kept fibers
@@ -125,29 +157,33 @@ ylabel('Proportion deleted fascicles','fontsize',fontSiz)
 xlabel('Fascicle length','fontsize',fontSiz)
 set(gca,'xlim',[0 200],...
     'xtick',[0 100 200],...
-    'ylim',    [0.0161 1], ...
-    'ytick',[0.0161 0.0312 0.0625 0.125 0.25 0.5 1], ...
+    'ylim',    [0.125/8 .5], ...
+    'ytick',[0.125/8 0.125/4 0.125/2 0.125 0.25 0.5], ...
     'yscale','log', ...
     'tickdir','out','box','off', ...
     'fontsize',fontSiz,'visible','on')
 
 end
 
+
+
 function f = plotMeanLengthHist(tractographyType,ol,olerr,cl,clerr,bins)
+
 fontSiz = 15;
 % Make a 2D histogram (scatter plot) of the percent deleted and kept fibers
 f = figure('name',sprintf('mean_length_hist_%s',tractographyType),'color','w');
-sh = plot([bins;bins],olerr,'-','color','r','linewidth',3);
+patch([bins,fliplr(bins)],[cl,zeros(size(cl))],[.6 .6 .6]);
 hold on
-sh = plot([bins;bins],clerr,'-','color','r','linewidth',3);
-sh = plot(bins,(ol),'-','color','k','markeredgecolor','w','markerfacecolor','k','markersize',12);
-sh = plot(bins,(cl),'-','color',[.6 .6 .6],'markeredgecolor','w','markerfacecolor',[.6 .6 .6],'markersize',12);
+patch([bins,fliplr(bins)],[ol,zeros(size(ol))],[.4 .4 .4]);
+sh = plot([bins;bins],olerr,'-','color','r','linewidth',2);
+sh = plot([bins;bins],clerr,'-','color','r','linewidth',2);
 ylabel('Number of fascicles','fontsize',fontSiz)
-xlabel('Fascicle length','fontsize',fontSiz)
-set(gca,'xlim',[0 200],...
-    'xtick',[0 100 200],...
-    'ylim',    [0 2.4*10^5], ...
-    'ytick',[0 1.2*10^5 2.4*10^5], ...
+xlabel('Fascicle length (mm)','fontsize',fontSiz)
+set(gca,'xscale','log', ...
+    'xlim',[2 256],...
+    'xtick',[2 4 8 16 32 64 128 256],...
+    'ylim',    [0 12000], ...
+    'ytick',[0 6000 12000], ...
     'tickdir','out','box','off', ...
     'fontsize',fontSiz,'visible','on')
 
@@ -164,8 +200,8 @@ ylabel('Number of fascicles','fontsize',fontSiz)
 xlabel('log_{10}(Fascicle weight)','fontsize',fontSiz)
 set(gca,'xlim',[-6 0],...
     'xtick',[-6 -3 0],...
-    'ylim',    [0 80000], ...
-    'ytick',[0 40000 80000], ...
+    'ylim', [0 8000], ...
+    'ytick',[0 4000 8000], ...
     'tickdir','out','box','off', ...
     'fontsize',fontSiz,'visible','on')
 
@@ -182,29 +218,30 @@ ylabel('Number of fascicles','fontsize',fontSiz)
 xlabel('log_{10}(Fiber weight)','fontsize',fontSiz)
 set(gca,'xlim',[-6 0],...
     'xtick',[-6 -3 0],...
-    'ylim',    [0 26000], ...
-    'ytick',[0 13000 26000], ...
+    'ylim',  [0 8000], ...
+    'ytick',[0 4000 8000], ...
     'tickdir','out','box','off', ...
     'fontsize',fontSiz,'visible','on')
 
 end
-
 function [f, oy, cy, bins] = plotLengthHist(tractographyType,olen,clen)
 fontSiz = 15;
 % Make a 2D histogram (scatter plot) of the percent deleted and kept fibers
 f = figure('name',sprintf('fiberlength_hist_%s',tractographyType),'color','w');
-bins = [10:36:200];
+%bins = [2,4,8,16,32,64,128,256,512];
+bins = [2:2:512];
 [oy,x]  = hist(olen,bins);
 [cy,x]  = hist(clen,bins);
-sh = plot(bins,(cy),'-','color',[.6 .6 .6],'markeredgecolor','w','markerfacecolor',[.6 .6 .6],'markersize',12);
+patch([x,fliplr(x)],[cy,zeros(size(cy))],[.6 .6 .6]);
 hold on
-sh = plot(bins,(oy),'-','color','k','markeredgecolor','w','markerfacecolor','k','markersize',12);
+patch([x,fliplr(x)],[oy,zeros(size(oy))],[.4 .4 .4]);
 ylabel('Number of fascicles','fontsize',fontSiz)
 xlabel('Fascicle length (mm)','fontsize',fontSiz)
-set(gca,'xlim',[0 200],...
-    'xtick',[10 100 200],...
-    'ylim',    [0 2.4*10^5], ...
-    'ytick',[0 1.2*10^5 2.4*10^5], ...
+set(gca,'xscale','log', ...
+    'xlim',[2 256],...
+    'xtick',[2 4 8 16 32 64 128 256],...
+    'ylim',    [0 10000], ...
+    'ytick',[0 5000 10000], ...
     'tickdir','out','box','off', ...
     'fontsize',fontSiz,'visible','on')
 
@@ -247,8 +284,8 @@ h(1) = bar(m,'facecolor','k'); hold on
 plot([1 2; 1 2],sd,'r-','linewidth',4)
 ylabel('Proportion','fontsize',fontSiz)
 set(gca,'tickdir','out','color','w','box','off', ...
-    'ylim',[0 .75], ...
-    'ytick',[0 .25 .5 .75], ...
+    'ylim',[0 1], ...
+    'ytick',[0 .25 .5 .75 1], ...
     'xlim',[0 3], 'fontsize',fontSiz,...
     'xticklabel',{'Deleted','Kept'})
 end

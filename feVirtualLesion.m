@@ -1,8 +1,8 @@
-function [streghtOfEvidence, fh, feLesion,  feNoLesion, connectivity, newFascicleIndices, indicesFibersKept, commonCoords] = ...
-          feVirtualLesion(feNoLesion,                  fascicleIndices, refitConnectome, displayFibers)
+function [se, fig,  feLesion,  feNoLesion, newFascicleIndices, indicesFibersKept, commonCoords] = ...
+          feVirtualLesion(feNoLesion, fascicleIndices, display, refitConnectome)
 %
-% [feLesion, feNoLesion, connectivity, newFascicleIndices, indicesFibersKept, commonCoords] = ...
-%  feTestFascicle(feNoLesion,fascicleIndices,[refitConnectome],[displayFibers])
+% [se, fh,  feLesion,  feNoLesion, newFascicleIndices, indicesFibersKept, commonCoords] = ...
+%           feVirtualLesion(feNoLesion, fascicleIndices, refitConnectome, display)
 %
 % Perform a virtual lesion.
 % - Remove a set of fascicles from a whole-brain connectome
@@ -14,8 +14,13 @@ function [streghtOfEvidence, fh, feLesion,  feNoLesion, connectivity, newFascicl
 %
 % Copyright Franco Pestilli Stanford University 2014
 
-if notDefined('displayFibers'),   displayFibers = 0;end
-if notDefined('refitConnectome'), refitConnectome=0;end
+if notDefined('display'),   
+    display.tract = 0;
+    display.distributions = 0; 
+    display.evidence = 0; 
+    fig = []; 
+end
+if notDefined('refitConnectome'), refitConnectome = 0;end
 
 % Handling parallel processing
 poolwasopen=1; % if a matlabpool was open already we do not open nor close one
@@ -33,6 +38,7 @@ feLesion = feConnectomeReduceFibers(feNoLesion, fascicles2keep );toc
 
 % Extract the fascicle out of the fiber group.
 fas = fgExtract(feGet(feNoLesion,'fibers img'), fascicleIndices, 'keep' );
+fasAcpc = fgExtract(feGet(feNoLesion,'fibers acpc'), fascicleIndices, 'keep' );
 
 % Get the cordinates of the fascicle we just deleted. These coordinates are
 % contained in the full connectome. We want to fin the indices in the M
@@ -60,8 +66,7 @@ tic,fprintf('\n[%s] Creating an unleasioned path-neighborhood connectome... ',mf
 toc
 
 tic,fprintf('\n[%s] Finding the pathneighborhood voxels... ',mfilename)
-% Here we return the indices of the fascicle in the newly resized
-% connectome.
+% Here we return the indices of the fascicle in the newly resized connectome.
 newFascicleIndices = ismember(find(indicesFibersKept),...
                               find(fascicleIndices),'rows');
 toc
@@ -79,122 +84,140 @@ if refitConnectome
         feFitModel(feGet(feNoLesion,'Mfiber'),   feGet(feNoLesion,'dsigdemeaned'), ...
         'bbnnls'));toc
 end
-keyboard
-% Now compute the connectivity measure of the voxel.
-% This is the sum of the weights of the fascile divided by the sum of the
-% weights of all the fibers in the same volume of white-matter.
-%
-% Find the weights for the path-neighborhood fibers.
-connectivity.wall = feGet(feNoLesion,'fiber weights');
-connectivity.wfas = connectivity.wall(newFascicleIndices);
-connectivity.wnfas = connectivity.wall(~newFascicleIndices);
+se = feComputeEvidence((feGetRep(feNoLesion,'vox  rmse')),(feGetRep(feLesion, 'vox  rmse')));
+   
+fig(1).name = sprintf('rmse_distributions_%s',mfilename);
+fig(1).h   = nan;
+fig(1).type = 'eps';
+if display.distributions
+    % Raw RMSE distirbutions
+    fig(1).name = sprintf('rmse_distributions_%s',mfilename);
+    fig(1).h   = figure('name',fig(1).name,'color','w');
+    fig(1).type = 'eps';
+    set(fig(1).h,'Units','normalized','Position',[0.007 0.55  0.28 0.36]);
+    plot(se.lesion.xhist,se.lesion.hist,'-','color', [.95 .45 .1],'linewidth',2); hold on
+    plot(se.nolesion.xhist,se.nolesion.hist,'-','linewidth',2, 'color', [.1 .45 .95])
+    plot([se.nolesion.rmse.mean,se.nolesion.rmse.mean], [0,0.12],'-','color',[.1 .45 .95] ) 
+    plot([se.lesion.rmse.mean,se.lesion.rmse.mean], [0,0.12], '-', 'color',[.95 .45 .1])
+    title(sprintf('mean RMSE\nno-lesion %2.3f | lesion %2.2f',se.nolesion.rmse.mean,se.lesion.rmse.mean),'fontsize',16)
+    ylabel('Probability', 'fontsize',14);xlabel('RMSE', 'fontsize',14)
+    legend({'Lesion','No lesion'},'fontsize',14);
+    set(gca,'box','off','xtick',[0 round(se.xrange(2)/2) se.xrange(2)],'ytick',[0 .06 .12],'xlim',[0 se.xrange(2)],'ylim',[0 .125], ...
+        'tickdir', 'out', 'ticklength', [0.025 0])
 
-% Compute some measures of strength of the connection represented by the
-% fascicle, by comparing the fascicle weights unlesioned the weights of all the
-% rest of the fascicles going through the same voxels.
-connectivity.strength(1) =    sum(connectivity.wfas) /  sum(connectivity.wnfas);
-connectivity.strength(2) =   mean(log10(connectivity.wfas)) / mean(log10(connectivity.wnfas));
-connectivity.strength(3) = median(log10(connectivity.wfas))/median(log10(connectivity.wnfas));
-
-% Compute S the strength of evidence in favor of the lesioned fascicle
-% Make a plot of the R-squared
-unlesioned.rmse      = mean(feGetRep(feNoLesion,   'vox  rmse'));
-unlesioned.rrmse     = median(feGetRep(feNoLesion,   'vox  rmse ratio'));
-unlesioned_rmseall   = (feGetRep(feNoLesion,   'vox  rmse'));
-
-lesioned.rmse    = median(feGetRep(feLesion,'vox  rmse'));
-lesioned.rrmse   = median(feGetRep(feLesion,'vox  rmse ratio'));
-lesioned_rmseall = (feGetRep(feLesion,'vox  rmse'));
-
-%% The following is the code for the bootstrap test on the MEAN rmse
-nboots=10000; nmontecarlo = 10;
-sizeunlesioned    = length(unlesioned_rmseall);
-nullDistributionW = nan(nboots,nmontecarlo);
-nullDistributionWO = nan(nboots,nmontecarlo);
-min_x = floor(mean([unlesioned_rmseall]) - mean([unlesioned_rmseall])*.05);
-max_x = ceil(mean([lesioned_rmseall]) + mean([lesioned_rmseall])*.05);
-
-for inm = 1:nmontecarlo
-    parfor ibt = 1:nboots
-        nullDistributionW(ibt,inm) = mean(randsample(unlesioned_rmseall,   sizeunlesioned,true));      
-        nullDistributionWO(ibt,inm) = mean(randsample(lesioned_rmseall,sizeunlesioned,true));
-    end
-    
-    % Distribution unlesioned
-    [y(:,inm),xhis] = hist(nullDistributionW(:,inm),linspace(min_x,max_x,200));
-    y(:,inm) = y(:,inm)./sum(y(:,inm));
-    
-    % Distribution lesioned
-    [woy(:,inm),woxhis] = hist(nullDistributionWO(:,inm),linspace(min_x,max_x,200));
-    woy(:,inm) = woy(:,inm)./sum(woy(:,inm));
-end
-y_m = mean(y,2);
-y_e = [y_m, y_m] + 2*[-std(y,[],2),std(y,[],2)];
-
-ywo_m = mean(woy,2);
-ywo_e = [ywo_m, ywo_m] + 2*[-std(woy,[],2),std(woy,[],2)];
-
-% Plot the null distribution and the empirical difference
-figName = sprintf('virtual_lesion_test_mean_rmse_hist_%s_%s',mfilename,feLesion.name);
-fh = mrvNewGraphWin(figName);
-patch([xhis,xhis],y_e(:),'b','FaceColor',[.67 .86 .96],'EdgeColor',[.67 .86 .96]); % Distribution as the +/- 2SD
-hold on
-patch([woxhis,woxhis],ywo_e(:),[.97 .66 .76],'FaceColor',[.97 .66 .76],'EdgeColor',[.97 .66 .76]); % Distribution as the +/- 2SD
-set(gca,'tickdir','out', ...
+    % Plot the null distribution and the empirical difference
+    % We reorganize the variables names hee below just to keep the plotting
+    % code more compact.
+    ywo_e = se.s.lesioned_e;
+    y_e   = se.s.unlesioned_e;
+    woxhis = se.s.lesioned.xbins;
+    xhis   = se.s.unlesioned.xbins;
+    min_x = se.s.min_x;
+    max_x = se.s.max_x; 
+    fig(2).name = sprintf('virtual_lesion_test_mean_rmse_hist_%s_%s',mfilename,feLesion.name);
+    fig(2).h   = figure('name',fig(2).name,'color','w');  
+    fig(2).type = 'eps';
+    set(fig(2).h,'Units','normalized','Position',[0.007 0.55  0.28 0.36]);
+    patch([xhis,xhis],y_e(:),[.1 .45 .95],'FaceColor',[.1 .45 .95],'EdgeColor',[.1 .45 .95]);
+    hold on
+    patch([woxhis,woxhis],ywo_e(:),[.95 .45 .1],'FaceColor',[.95 .45 .1],'EdgeColor',[.95 .45 .1]);
+    set(gca,'tickdir','out', ...
         'box','off', ...
-        'ylim',[0 0.45], ... 
+        'ylim',[0 0.25], ...
         'xlim',[min_x,max_x], ...
-        'ytick',[0 0.2 0.4], ...
+        'ytick',[0 0.1 0.2], ...
         'xtick',round(linspace(min_x,max_x,4)), ...
         'fontsize',16)
-ylabel('Probability','fontsize',16)
-xlabel('rmse','fontsize',16')
-
-% (3) Compute the probability that the empirical difference (1) was
-%     observed by chance given th data, by looking at the percentile of the
-%     empirical difference in the Nul distribution (2).
-streghtOfEvidence = mean(diff([mean(nullDistributionW,1); ...
-                          mean(nullDistributionWO,1)])./sqrt(sum([std(nullDistributionW,[],1);std(nullDistributionWO,[],1)].^2,1)));
-title(sprintf('Strength of connection evidence %2.3f',(streghtOfEvidence)), ...
-    'FontSize',16)
-
-% The following is test code to show where the coordinates of the facicle
-% that were removed land inside the connectoem. Also I show in gray hte
-% connectome lesioned the fascicle and in red the connectome unlesioned the
-% fascicle. Where there is only red in the connectoem that is where the
-% fascicle was removed but we are attemtping to explain the variance in the
-% data.
-if displayFibers
-    % Show the coordinates to see if we are in the right spot
-    mrvNewGraphWin('Coordinate check');
-    plot3(allCoords(commonCoords,1),allCoords(commonCoords,2), ...
-          allCoords(commonCoords,3),'ko','MarkerFaceColor','k','MarkerSize',8);
-    hold on;
-    plot3(fasCoords(:,1),fasCoords(:,2),fasCoords(:,3),'ro', ...
-          'MarkerFaceColor','r','MarkerSize',3);
-    axis equal
-    %view(3,79)
-    view(-23,-23);
-    
-    % Now display the fascicle removed and the connectome lesioned the fascicle
-    % in one figure unlesioned different colors.
-    %
-    feConnectomeDisplay(feSplitLoopFibers(feGet(feLesion,'fibers img')),figure);
-    hold on
-    %feConnectomeDisplay(feSplitLoopFibers(feGet(feNoLesion,'fibers img')),gcf, [.95 .1 .1])   
-    feConnectomeDisplay(feSplitLoopFibers(fas),gcf,[.95 .1 .1]);
-    view(-23,-23);
-    h= camlight;
-
-    feConnectomeDisplay(feSplitLoopFibers(feGet(feLesion, ...
-                        'fibers img')),figure);
-    hold on
-    plot3(allCoords(commonCoords,1),allCoords(commonCoords,2), ...
-        allCoords(commonCoords,3),'go','MarkerFaceColor','g','MarkerSize',12);
-    view(-23,-23);
-    h= camlight;       
+    ylabel('Probability','fontsize',16)
+    xlabel('rmse','fontsize',16')
+    title(sprintf('Strength of connection evidence %2.3f',(se.s.mean)), 'FontSize',16)
 end
 
+fig(3).name = sprintf('tract_%s',mfilename);
+fig(3).h   = nan;
+fig(3).type = 'jpg';
+fig(4).name = sprintf('pathneighborhood_%s',mfilename);
+fig(4).h   = nan;
+fig(4).type = 'jpg';
+fig(5).name = sprintf('pathneighborhood_AND_tract_%s',mfilename);
+fig(5).h   = nan;
+fig(5).type = 'jpg';
+if display.tract
+    % Now display the lesion performed.
+    % (1) The fascicle to delete.
+    fig(3).name = sprintf('tract_%s',mfilename);
+    fig(3).h   = figure('name',fig(3).name,'color',[.1 .45 .95]); 
+    fig(3).type = 'jpg';
+    [fig(3).h, fig(3).light] =  mbaDisplayConnectome(mbaFiberSplitLoops(fasAcpc.fibers),fig(3).h, [.1 .45 .95],'single',[],[],.2);
+    view(-23,-23);delete(fig(3).light); fig(3).light = camlight('right');
+        
+    tmp_fas = feGet(feNoLesion,'fibers acpc');
+    fibers2display = randsample(1:length(tmp_fas.fibers),ceil(0.01*length(tmp_fas.fibers)));
+    fig(4).name = sprintf('pathneighborhood_%s',mfilename);
+    fig(4).h   = figure('name',fig(4).name,'color',[.1 .45 .95]);     
+    fig(4).type = 'jpg';
+    [fig(4).h, fig(4).light] =  mbaDisplayConnectome(mbaFiberSplitLoops(...
+        tmp_fas.fibers(fibers2display)),fig(4).h, [.95 .45 .1],'single',[],.6,.2);
+    view(-23,-23);delete(fig(2).light); fig(4).light = camlight('right');
+
+    % (2) The facicle with the pah neighborhood  
+    fig(5).name = sprintf('pathneighborhood_AND_tract_%s',mfilename);
+    fig(5).h   = figure('name',fig(5).name,'color',[.1 .45 .95]);
+    fig(5).type = 'jpg';
+    [fig(5).h, fig(5).light] =  mbaDisplayConnectome(mbaFiberSplitLoops(fasAcpc.fibers),fig(5).h, [.1 .45 .95],'single',[],[],.2);
+    view(-23,-23);delete(fig(5).light);
+    hold on
+    [fig(5).h, fig(5).light] =  mbaDisplayConnectome(mbaFiberSplitLoops(...
+        tmp_fas.fibers(fibers2display)),fig(5).h, [.95 .45 .1],'single',[],.6,.2);
+    view(-23,-23);delete(fig(5).light); fig(5).light = camlight('right');
+ 
+    % Show the voxels coordinates to see if we are in the right spot
+    plot_test_fiber_location_debug= false;
+    if plot_test_fiber_location_debug
+        figure('name','Coordinate check');
+        plot3(allCoords(commonCoords,1),allCoords(commonCoords,2), ...
+            allCoords(commonCoords,3),'ko','MarkerFaceColor','k','MarkerSize',8);
+        hold on;
+        plot3(fasCoords(:,1),fasCoords(:,2),fasCoords(:,3),'ro', ...
+            'MarkerFaceColor',[.95 .45 .1],'MarkerSize',3);
+        axis equal
+        view(-23,-23); hold on
+        plot3(allCoords(commonCoords,1),allCoords(commonCoords,2), ...
+            allCoords(commonCoords,3),'go','MarkerFaceColor','g','MarkerSize',12);
+        view(-23,-23);
+    end
+end
+
+% RMSE distributions
+fig(6).name = sprintf('Size_of_effect_of_the_lesion_%s',mfilename);
+fig(6).type = 'eps';   
+fig(6).h   = nan;
+if display.evidence
+    fig(6).name = sprintf('Size_of_effect_of_the_lesion_%s',mfilename);
+    fig(6).h   = figure('name',fig(6).name,'color','w');
+    set(fig(6).h,'Units','normalized','Position',[0.007 0.55  0.28 0.36]);
+    subplot(1,4,1)
+    plot(1,se.s.mean,'-o','color', [.95 .45 .1],'linewidth',2); hold on
+    plot([1,1], [se.s.mean,se.s.mean] + [-se.s.std,se.s.std], '-','color',[.95 .45 .1] )
+    ylabel('S (s.d.)', 'fontsize',14);
+    set(gca,'box','off','xlim',[0 2], 'ylim',[0 ceil(se.s.mean + se.s.std)], ...
+        'tickdir', 'out', 'ticklength', [0.025 0])
+    subplot(1,4,2)
+    plot(1,se.em.mean,'-o','color', [.95 .45 .1],'linewidth',2); hold on
+    ylabel('Earth mover''s distance (raw scanner units)', 'fontsize',14);
+    set(gca,'box','off','xlim',[0 2], 'ylim',[0 ceil(se.em.mean)], ...
+        'tickdir', 'out', 'ticklength', [0.025 0])
+    subplot(1,4,3)
+    plot(1,se.kl.mean,'-o','color', [.95 .45 .1],'linewidth',2); hold on
+    ylabel('K-L divergence (bits)', 'fontsize',14);
+    set(gca,'box','off','xlim',[0 2], 'ylim',[0 ceil(se.kl.mean)], ...
+        'tickdir', 'out', 'ticklength', [0.025 0])
+    subplot(1,4,4)
+    plot(1,se.j.mean,'-o','color', [.95 .45 .1],'linewidth',2); hold on
+    ylabel('Jeffrey''s divergence (bits)', 'fontsize',14);
+    set(gca,'box','off','xlim',[0 2], 'ylim',[0 ceil(se.j.mean)], ...
+        'tickdir', 'out', 'ticklength', [0.025 0])
+end
 if ~poolwasopen, matlabpool close; end
 
 end

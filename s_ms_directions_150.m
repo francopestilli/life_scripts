@@ -12,7 +12,7 @@ subjects = {'FP_150dirs_b1000_2000_4000_2iso'};
 
 if notDefined('saveDir'), savedir = fullfile('/marcovaldo/frk/Dropbox','pestilli_etal_revision',mfilename);end
 if notDefined('trackingType'), trackingType = 'lmax10';end
-if notDefined('numDirs'), numDirs = [96,64,32,16,8];end
+if notDefined('numDirs'), numDirs = [150:-5:10];end
 addpath(genpath('/marcovaldo/frk/git/boot_dwi'))
 
 % Bins for the fiber density estimates
@@ -63,6 +63,11 @@ fprintf('[%s] Extracting info: \n%s\n ======================================== \
             fe = feSet(fe,'fg from acpc',fgRead(fullfile(fiberPath,fibers.name)));
         end
         w       = feGet(fe,'fiber weights');
+        
+        % Compute the total number of fibers retained at each direction number.
+        m.optimized.nfibers(iNumDirs,isbj) = sum(w > 0);
+        m.optimized.ndirs(iNumDirs,isbj)   = numDirs(iNumDirs);
+        
         numFibers_total(iNumDirs,isbj) = length(w);
         numFibers_good(iNumDirs,isbj)  = sum(w > 0);
         
@@ -104,7 +109,7 @@ fprintf('[%s] Extracting info: \n%s\n ======================================== \
         fe.life.Mfiber = fe.life.Mfiber(allIndices,:);
         fe.life.dSig = fe.life.dSig(allIndices);
         fe   = feSet(fe,'fit',feFitModel(fe.life.Mfiber,fe.life.dSig','bbnnls'));
-
+        
        if doFD
             fprintf('[%s] Computing fiber density: \n%s\n ======================================== \n\n',mfilename,feFileToLoad)
             % Get the fiber density
@@ -124,6 +129,7 @@ fprintf('[%s] Extracting info: \n%s\n ======================================== \
     m.density.candidate_median(iNumDirs,isbj)     = nanmedian(fdOImg(:));
     
     x = [1 2.^[1 2 3 4 5 6 7 8 9 10]];
+    x = [2:2:512];
     [yFD(iNumDirs,isbj,:), xFD(iNumDirs,isbj,:)]  = hist(fdImg(:),x);
      yFD(iNumDirs,isbj,:) = 100*yFD(iNumDirs,isbj,:)./sum(yFD(iNumDirs,isbj,:));
     [yoFD(iNumDirs,isbj,:),xoFD(iNumDirs,isbj,:)]= hist(fdOImg(:),x);
@@ -148,11 +154,11 @@ m.nfibers.x = numDirs;
 saveDir = fullfile(savedir,'average_150_2mm');
 
 % Save the results to file, it takes along time to load all these FE strctures...
-m.density.candidatey  = squeeze(mean(yFD,2));
-m.density.candidateSte= squeeze(std(yFD,[],2)./sqrt(size(yFD,2)));
-m.density.optimaly    = squeeze(mean(yoFD,2));
-m.density.optimalSte  = squeeze(std(yoFD,[],2)./sqrt(size(yoFD,2)));
-m.density.x = squeeze(xFD(:,isbj,:));
+%m.density.candidatey  = squeeze(mean(yFD,2));
+%m.density.candidateSte= squeeze(std(yFD,[],2)./sqrt(size(yFD,2)));
+%m.density.optimaly    = squeeze(mean(yoFD,2));
+%m.density.optimalSte  = squeeze(std(yoFD,[],2)./sqrt(size(yoFD,2)));
+%m.density.x = squeeze(xFD(:,isbj,:));
 m.density.units = {'x=Fascicles per voxel','y=percent voxels'};
 m.density.yFD=yFD;
 m.density.yoFD=yoFD;
@@ -175,7 +181,7 @@ m.rrmse.units = {'x=Rrmse (a.u.)','y=percent voxels'};
 m.rrmse.yRrmse=yRrmse;
 
 mkdir(saveDir)
-save(fullfile(saveDir,'mean_histograms.mat'),'m','numFibers_total','numFibers_good')
+save(fullfile(saveDir,'mean_histograms_steps10.mat'),'m','numFibers_total','numFibers_good')
 
 % Histogram plots
 figName = sprintf('FibDensHistCandVSOpt_NDirs%i_%i_%i_%i_%i_%s',numDirs,  fname(1:39));

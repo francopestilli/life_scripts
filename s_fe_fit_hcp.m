@@ -1,4 +1,4 @@
-function fe = s_fe_fit_hcp(bval,hemisphere,doClipping,dataDir)
+function fe = s_fe_fit_hcp(bval,hemisphere,doClipping,dataDir,which_subject)
 %
 % This function:
 %  - Initializes a LIFE structure from a candidate connectome
@@ -12,11 +12,11 @@ function fe = s_fe_fit_hcp(bval,hemisphere,doClipping,dataDir)
 %
 % Copyright Franco Pestilli (2014) Vistasoft Stanford University
 if notDefined('bval'); bval=2000;end
-if notDefined('hemisphere'); hemisphere='left';end
+if notDefined('hemisphere'); hemisphere='both';end
 if notDefined('doClipping');
     doClipping=true;
 end
-if notDefined('dataDir'); dataDir='2t2';end
+if notDefined('dataDir'); dataDir='2t1';end
 
 % Get the base directory for the data
 [~,hostname] = system('hostname');
@@ -31,9 +31,9 @@ switch dataDir
                 
         end
         subjects = {...
-            '118730', ...
             '115320', ...
             '117122', ...
+            '118730', ...
             };
         
     case {'2t1'}
@@ -54,7 +54,7 @@ switch dataDir
         keyboard
 end
 
-for isbj = 1:length(subjects)
+for isbj = which_subject
     % Build the file names for the diffusion data, the anatomical MR, the fiber
     % group containing the connectome and the
     dwiPath  = fullfile(datapath,subjects{isbj},'diffusion_data');
@@ -85,19 +85,25 @@ for isbj = 1:length(subjects)
         case {'right'}
             clip{1} = [-80,  0]; % Right - Left deleted
             clip{2} = [-8,   90]; % Anterior - Posterior deleted
+            clip{3} = [43,  90]; % Superior - Inferior deleted   
+        case {'both'}
+            clip{1} = [];  % NO Right - Left deleted
+            clip{2} = [-8,   90]; % Anterior - Posterior deleted
             clip{3} = [43,  90]; % Superior - Inferior deleted
+
         otherwise
-            disp('computing th whole brain conectoem... no clipping applied.')
+            disp('computing th whole brain conectome... no clipping applied.')
     end
     
     
     % We build one modelper fiber group, whole brain fiber group
-    for iFib = 1;%[1 2 9]
+    for iFib = [1]
         % Intialize a local matlab cluster if the parallel toolbox is available.
         feOpenLocalCluster;
         
         % The final connectome and dat astructure will be saved with this name:
         [~,feFileName] = fileparts(fgFiles(iFib).name);
+        feFileName = [feFileName,'_recomputed'];
         
         % Build a full-file of the fibers and the FE structure
         fgFileName = fullfile(fibersPath,fgFiles(iFib).name);
@@ -117,7 +123,7 @@ for isbj = 1:length(subjects)
             
             % Initialize the Connectome
             fe = feConnectomeInit(dwiFile,fg,feFileName,savedir,dwiFileRepeat,t1File);
-            
+            clear feFileName
             M    = feGet(fe,'mfiber');
             dSig = feGet(fe,'dsigdemeaned');
             

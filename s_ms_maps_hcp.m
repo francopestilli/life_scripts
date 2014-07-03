@@ -7,25 +7,24 @@ function s_ms_maps_hcp(trackingType)
 % See also:
 
 % Get the base directory for the data
-datapath = '/marcovaldo/frk/2t2/HCP/';
-subjects = {'115320','117122','118730'};
+subjects = {'105115','110411','111312','113619','115320','117122','118730'};
 
 if notDefined('saveDir'), savedir = fullfile('/marcovaldo/frk/Dropbox/','pestilli_etal_revision',mfilename);end
 if notDefined('trackingType'), trackingType = 'lmax10';end
+saveDirM = fullfile(savedir,'average_hcp_1p25mm');
 
-% Bins for the fiber density estimates
-xBins = [1 2 4 8 16 32 64 128 256 512 1024 2048];
-x     = 1:length(xBins);
-
-% Bins for the sum of weights estimates
-wxBins = [.9./(2.^[10:-1:1]) ];
-wx     = 1:length(wxBins);
-
-doFD       = 1;
-figVisible = 'off';
+doFD       = true;
+figVisible = 'on';
 doMAPS = false;
-
+recompute = false;
+if recompute
 for isbj = 1:length(subjects)
+     % Directory where to load the results
+    if isbj <= 4
+       datapath = '/marcovaldo/frk/2t1/HCP/';
+    else
+        datapath = '/marcovaldo/frk/2t2/HCP/';
+    end
     % High-resolution Anatomy
     t1File = fullfile(datapath,subjects{isbj},'anatomy','/T1w_acpc_dc_restore_1p25.nii.gz');
     t1     = niftiRead(t1File);
@@ -33,7 +32,7 @@ for isbj = 1:length(subjects)
     
     % File to load   
     connectomesPath   = fullfile(datapath,subjects{isbj},'connectomes');
-    feFileToLoad = dir(fullfile(connectomesPath,sprintf('*%s*right.mat',trackingType)));
+    feFileToLoad = dir(fullfile(connectomesPath,sprintf('*%s*cerebellum*.mat',trackingType)));
     fname = feFileToLoad.name(1:end-4);
     feFileToLoad = fullfile(connectomesPath,fname);
 
@@ -60,8 +59,6 @@ for isbj = 1:length(subjects)
         fe = feConnectomeSetDwi(fe,fe.path.dwifilerep,true);
     end
     rmseM   = feGetRep(fe, 'vox rmse');
-    rmseD   = feGetRep(fe, 'vox rmse data');
-    rmseR = feGetRep(fe, 'vox rmse ratio');
     slice   = 2;%[-80:4:-2 2:4:80];
     clear fe
     
@@ -208,7 +205,8 @@ for isbj = 1:length(subjects)
     % Histogram plots
     figName = sprintf('FibDensHistCandVSOpt_%s',fname);
     fh  = figure('name',figName,'visible',figVisible,'color','w');
-    x = [1 2.^[1 2 3 4 5 6 7 8 9 10]];
+    %x = [1 2.^[1 2 3 4 5 6 7 8 9 10]];
+    x = [1:4:1024];
     fdOImg(fdOImg == 0) = nan;
     fdImg(fdImg == 0) = nan;
     [yFD(isbj,:),xFD(isbj,:)]  = hist(fdImg(:),x);
@@ -220,15 +218,15 @@ for isbj = 1:length(subjects)
     xlabel('Fascicles per voxel','FontSize',16,'FontAngle','oblique')
     legend(gca,{'Candidated','Optimized'},'box','off')
     set(gca,'fontsize',16, ...
-        'ylim', [0 30], ...
-        'ytick',[0 15 30], ...
-        'xlim', [0.5 2^10],'xtick',x,...
+        'ylim', [0 20], ...
+        'ytick',[0 10 20], ...
+        'xlim', [0.5 1024],'xtick',[1 2.^[1 2 3 4 5 6 7 8 9 10]],...
         'box','off','tickdir','out','ticklength',[0.025 0])
     saveFig(fh,fullfile(saveDir, figName),1)
     
     figName = sprintf('RMSE_HistDataVSOpt_%s',fname);
     fh  = figure('name',figName,'visible',figVisible,'color','w');
-    x   = 0:10:700;
+    x   = 0:10:800;
    [yoRMSE(isbj,:),xoRMSE(isbj,:)]= hist(rmseM(:),x);    
     yoRMSE(isbj,:) = 100*yoRMSE(isbj,:)./sum(yoRMSE(isbj,:));
     plot(xoRMSE(isbj,:),yoRMSE(isbj,:),'r-','linewidth',2)
@@ -238,13 +236,12 @@ for isbj = 1:length(subjects)
     set(gca,'fontsize',16, ...
         'ylim', [0 14], ...
         'ytick',[0 7 14], ...
-        'xlim', [0 700],'xtick',[0 350 700],...
+        'xlim', [0 800],'xtick',[0 400 800],...
         'box','off','tickdir','out','ticklength',[0.025 0])
     saveFig(fh,fullfile(saveDir, figName),1)
+    
 end
-
 % Average histograms
-saveDir = fullfile(savedir,'average_hcp_1p25mm');
 
 % Save the results to file, it takes along time to load all these FE strctures...
 m.density.candidatey  = mean(yFD,1);
@@ -263,9 +260,17 @@ m.rmse.x       = xoRMSE(isbj,:);
 m.rmse.units = {'x=rmse (raw scanner units)','y=percent voxels'};
 m.rmse.yoRMSE=yoRMSE;
 
-mkdir(saveDir)
-save(fullfile(saveDir,'mean_histograms.mat'),'m')
-
+mkdir(saveDirM)
+save(fullfile(saveDirM,'mean_histograms_cerebellum.mat'),'m','fname')
+else
+    load(fullfile(saveDirM,'mean_histograms_cerebellum.mat'),'m','fname')
+    if notDefined('fname')
+        datapath = '/marcovaldo/frk/2t1/HCP/';
+        connectomesPath   = fullfile(datapath,subjects{1},'connectomes');
+        feFileToLoad = dir(fullfile(connectomesPath,sprintf('*%s*cerebellum*.mat',trackingType)));
+        fname = feFileToLoad.name(1:end-4);
+    end
+end
 % Histogram plots
 figName = sprintf('FibDensHistCandVSOpt_%s',fname);
 fh  = figure('name',figName,'visible',figVisible,'color','w');
@@ -280,11 +285,29 @@ ylabel('Percent voxels','FontSize',16,'FontAngle','oblique')
 xlabel('Fascicles per voxel','FontSize',16,'FontAngle','oblique')
 legend(gca,{'Candidated','Optimized'},'box','off')
 set(gca,'fontsize',16, ...
-    'ylim', [0 30], ...
-    'ytick',[0 15 30], ...
-    'xlim', [0.5 2^10],'xtick',[m.density.x],...
+        'ylim', [0 20], ...
+        'ytick',[0 10 20], ...
+        'xlim', [0.5 1024],'xtick',[1 2.^[1 2 3 4 5 6 7 8 9 10]],...
+        'box','off','tickdir','out','ticklength',[0.025 0])
+saveFig(fh,fullfile(saveDirM, figName),1)
+
+figName = sprintf('FibDensHistCandVSOpt_PATCH_%s',fname);
+fh  = figure('name',figName,'visible',figVisible,'color','w');
+yC = [0 m.density.candidatey-m.density.candidateSte 0,0 m.density.candidatey+m.density.candidateSte 0];
+yO = [0 m.density.optimaly-m.density.optimalSte   0,0 m.density.optimaly+m.density.optimalSte   0];
+patch([1 m.density.x 1024,1 m.density.x 1024], yC,'k','facecolor','k','edgecolor','k');
+hold on
+patch([1 m.density.x 1024,1 m.density.x 1024], yO,'r','facecolor','r','edgecolor','r');
+ylabel('Percent voxels','FontSize',16,'FontAngle','oblique')
+xlabel('Fascicles per voxel','FontSize',16,'FontAngle','oblique')
+legend(gca,{'Candidated','Optimized'},'box','off')
+set(gca,'fontsize',16, ...
+    'xscale', 'log', ...
+    'ylim', [0 20], ...
+    'ytick',[0 10 20], ...
+    'xlim', [0.5 1024],'xtick',[1 2.^[1 2 3 4 5 6 7 8 9 10]],...
     'box','off','tickdir','out','ticklength',[0.025 0])
-saveFig(fh,fullfile(saveDir, figName),1)
+saveFig(fh,fullfile(saveDirM, figName),1)
 
 figName = sprintf('RMSE_mean_HistDataVSOpt_%s',fname);
 fh  = figure('name',figName,'visible',figVisible,'color','w');
@@ -300,7 +323,7 @@ xlabel('RMSE (raw scanner units)','FontSize',16,'FontAngle','oblique')
         'ytick',[0 7 14], ...
         'xlim', [0 700],'xtick',[0 350 700],...
         'box','off','tickdir','out','ticklength',[0.025 0])
-saveFig(fh,fullfile(saveDir, figName),1)
+saveFig(fh,fullfile(saveDirM, figName),1)
 
 end  % Main function
 

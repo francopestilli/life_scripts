@@ -12,17 +12,12 @@ subjects = {'FP_150dirs_b1000_2000_4000_2iso'};
 
 if notDefined('saveDir'), savedir = fullfile('/marcovaldo/frk/Dropbox/','pestilli_etal_revision',mfilename);end
 if notDefined('trackingType'), trackingType = 'lmax10';end
+saveDirM = fullfile(savedir,'average_hcp_1p25mm');
 
-% Bins for the fiber density estimates
-xBins = [1 2 4 8 16 32 64 128 256 512 1024 2048];
-x     = 1:length(xBins);
-
-% Bins for the sum of weights estimates
-wxBins = [.9./(2.^[10:-1:1]) ];
-wx     = 1:length(wxBins);
-
-doFD       = 1;
-figVisible = 'off';
+doFD       = true;
+figVisible = 'on';
+doMAPS = false;
+recompute = false;
 probIndex = 1; %for 2000bval, Deterministic index 2: for 200 bval
 
 for isbj = 1:length(subjects)
@@ -40,7 +35,7 @@ for isbj = 1:length(subjects)
     fprintf('[%s] Loading: \n%s\n ======================================== \n\n',mfilename,feFileToLoad)
     load(feFileToLoad);
     fprintf('[%s] Extracting info: \n%s\n ======================================== \n\n',mfilename,feFileToLoad)
-    coords  = feGet(fe,'roi coords');
+    coords  = feGet(fe,'roi coords')+1;
     xform   = feGet(fe,'xform img 2 acpc');
     mapsize = feGet(fe, 'map size');
     if isempty(fe.fg)
@@ -113,8 +108,8 @@ for isbj = 1:length(subjects)
         
         % Fiber density maps:
         % This will be used to normalize the rage of the fiber density across plots
-        minfd = 2;   % Min fiber density
-        maxfd = 256; % Max fiber density
+        minfd = 1;   % Min fiber density
+        maxfd = 1024; % Max fiber density
         
         % Optimized connectome
         map     = 'jet';
@@ -198,7 +193,7 @@ for isbj = 1:length(subjects)
     % Histogram plots
     figName = sprintf('FibDensHistCandVSOpt_%s',fname);
     fh  = figure('name',figName,'visible',figVisible,'color','w');
-    x = [1 2.^[1 2 3 4 5 6 7 8 9 10]];
+    x = [1:4:1024];
     fdOImg(fdOImg == 0) = nan;
     fdImg(fdImg == 0) = nan;
 
@@ -211,9 +206,9 @@ for isbj = 1:length(subjects)
     xlabel('Fascicles per voxel','FontSize',16,'FontAngle','oblique')
     legend(gca,{'Candidated','Optimized'},'box','off')
     set(gca,'fontsize',16, ...
-        'ylim', [0 30], ...
-        'ytick',[0 15 30], ...
-        'xlim', [0.5 2^11],'xtick',x,...
+        'ylim', [0 20], ...
+        'ytick',[0 10 20], ...
+        'xlim', [0.5 1024],'xtick',[1 2.^[1 2 3 4 5 6 7 8 9 10]],...
         'box','off','tickdir','out','ticklength',[0.025 0])
     saveFig(fh,fullfile(saveDir, figName),1)
     
@@ -252,6 +247,7 @@ for isbj = 1:length(subjects)
     xlabel('R_{rmse}','FontSize',16,'FontAngle','oblique');
     title(sprintf('R < 1 in %2.0f%% of voxels',round(proportionModelBetter)),'FontSize',16,'FontAngle','oblique')
     set(gca,'fontsize',16, ...
+                'xscale', 'log', ...
         'ylim', [0 14], ...
         'ytick',[0 7 14], 'xscale', 'log', ...
         'xlim', [.5 2],'xtick',[.5 1 2],...
@@ -306,11 +302,29 @@ ylabel('Percent voxels','FontSize',16,'FontAngle','oblique')
 xlabel('Fascicles per voxel','FontSize',16,'FontAngle','oblique')
 legend(gca,{'Candidated','Optimized'},'box','off')
 set(gca,'fontsize',16, ...
-    'ylim', [0 60], ...
-    'ytick',[0 30 60], ...
-    'xlim', [2 2^11],'xtick',[2 m.density.x],...
+        'ylim', [0 20], ...
+        'ytick',[0 10 20], ...
+        'xlim', [0.5 1024],'xtick',[1 2.^[1 2 3 4 5 6 7 8 9 10]],...
+        'box','off','tickdir','out','ticklength',[0.025 0])
+saveFig(fh,fullfile(saveDirM, figName),1)
+
+figName = sprintf('FibDensHistCandVSOpt_PATCH_%s',fname);
+fh  = figure('name',figName,'visible',figVisible,'color','w');
+yC = [0 m.density.candidatey-m.density.candidateSte 0,0 m.density.candidatey+m.density.candidateSte 0];
+yO = [0 m.density.optimaly-m.density.optimalSte   0,0 m.density.optimaly+m.density.optimalSte   0];
+patch([1 m.density.x 1024,1 m.density.x 1024], yC,'k','facecolor','k','edgecolor','k');
+hold on
+patch([1 m.density.x 1024,1 m.density.x 1024], yO,'r','facecolor','r','edgecolor','r');
+ylabel('Percent voxels','FontSize',16,'FontAngle','oblique')
+xlabel('Fascicles per voxel','FontSize',16,'FontAngle','oblique')
+legend(gca,{'Candidated','Optimized'},'box','off')
+set(gca,'fontsize',16, ...
+    'xscale', 'log', ...
+    'ylim', [0 20], ...
+    'ytick',[0 10 20], ...
+    'xlim', [0.5 1024],'xtick',[1 2.^[1 2 3 4 5 6 7 8 9 10]],...
     'box','off','tickdir','out','ticklength',[0.025 0])
-saveFig(fh,fullfile(saveDir, figName),1)
+saveFig(fh,fullfile(saveDirM, figName),1)
 
 figName = sprintf('RMSE_mean_HistDataVSOpt_%s',fname);
 fh  = figure('name',figName,'visible',figVisible,'color','w');

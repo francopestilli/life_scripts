@@ -9,8 +9,7 @@ function s_ms_directions_96(trackingType)
 % Get the base directory for the data
 datapath = '/marcovaldo/frk/2t1/predator/';
 subjects = {...   
-    'KK_96dirs_b2000_1p5iso', ...
-    'JW_96dirs_b2000_1p5iso', ... 
+    'KK_96dirs_b2000_1p5iso', ...    'JW_96dirs_b2000_1p5iso', ... 
     'HT_96dirs_b2000_1p5iso', ...
     'KW_96dirs_b2000_1p5iso', ...
     'FP_96dirs_b2000_1p5iso', ...
@@ -32,7 +31,7 @@ for isbj = 1:length(subjects)
     
     % File to load   
     connectomesPath   = fullfile(datapath,subjects{isbj},'connectomes');
-    feFileToLoad = dir(fullfile(connectomesPath,sprintf('*%s*.mat',trackingType)));
+    feFileToLoad = dir(fullfile(connectomesPath,sprintf('*%s*recomputed.mat',trackingType)));
     fname = feFileToLoad(probIndex).name(1:end-4);
     feFileToLoad = fullfile(connectomesPath,fname);
     fprintf('[%s] Loading: \n%s\n ======================================== \n\n',mfilename,feFileToLoad)
@@ -60,6 +59,9 @@ for isbj = 1:length(subjects)
             fe = feSet(fe,'fg from acpc',fgRead(fullfile(fiberPath,fibers.name)));
         end
         w       = feGet(fe,'fiber weights');
+         % Compute the total number of fibers retained at each direction number.
+        m.optimized.nfibers(iNumDirs,isbj) = sum(w > 0);
+        m.optimized.ndirs(iNumDirs,isbj)   = numDirs(iNumDirs);
         numFibers_total(iNumDirs,isbj) = length(w);
         numFibers_good(iNumDirs,isbj)  = sum(w > 0);
         
@@ -102,7 +104,7 @@ for isbj = 1:length(subjects)
         fe.life.dSig = fe.life.dSig(allIndices);
         fe   = feSet(fe,'fit',feFitModel(fe.life.Mfiber,fe.life.dSig','bbnnls'));
 
-       if doFD
+        if doFD
             fprintf('[%s] Computing fiber density: \n%s\n ======================================== \n\n',mfilename,feFileToLoad)
             % Get the fiber density
             % fd = feGet(fe,'fiber density');
@@ -121,6 +123,7 @@ for isbj = 1:length(subjects)
     m.density.candidate_median(iNumDirs,isbj)     = nanmedian(fdOImg(:));
     
     x = [1 2.^[1 2 3 4 5 6 7 8 9 10]];
+    x = [2:2:512];
     [yFD(iNumDirs,isbj,:),xFD(iNumDirs,isbj,:)]  = hist(fdImg(:),x);
      yFD(iNumDirs,isbj,:) = 100*yFD(iNumDirs,isbj,:)./sum(yFD(iNumDirs,isbj,:));
     [yoFD(iNumDirs,isbj,:),xoFD(iNumDirs,isbj,:)]= hist(fdOImg(:),x);
@@ -173,10 +176,10 @@ m.rrmse.units = {'x=Rrmse (a.u.)','y=percent voxels'};
 m.rrmse.yRrmse=yRrmse;
 
 mkdir(saveDir)
-save(fullfile(saveDir,'mean_histograms.mat'),'m','numFibers_total','numFibers_good')
+save(fullfile(saveDir,'mean_histograms_recomputed_steps10.mat'),'m','numFibers_total','numFibers_good')
 
 % Histogram plots
-figName = sprintf('FibDensHistCandVSOpt_NDirs96_%i_%i_%i_%i_%s',numDirs,  fname);
+figName = sprintf('FibDensHistCandVSOpt_NDirs96__%i_%i_%i_%i_%s_RECOM',numDirs,  fname);
 colors = {[.9 .3 .3],[.9 .45 .35],[.9 .55 .5],[.9 .6 .6],[.9 .8 .8]};
 fh  = figure('name',figName,'visible',figVisible,'color','w');
 for iNDirs = 1:size(m.density.x,1)
@@ -199,7 +202,7 @@ set(gca,'fontsize',16, ...
 saveFig(fh,fullfile(saveDir, figName),1)
 end
 
-figName = sprintf('RMSE_mean_HistDataVSOpt_NDirs96_%i_%i_%i_%i_%s',numDirs,  fname);
+figName = sprintf('RMSE_mean_HistDataVSOpt_NDirs96_%i_%i_%i_%i_%s_RECOMP',numDirs,  fname);
 fh  = figure('name',figName,'visible',figVisible,'color','w');
 for iNDirs = 1:size(m.rmse.x,1)
 plot(m.rmse.x(iNDirs, :),m.rmse.data(iNDirs, :),'k-','linewidth',2,'color',[.15 .15 .15].*iNDirs)
@@ -222,7 +225,7 @@ end
 
 for iNDirs = 1:size(m.rrmse.x,1)
    
-    figName = sprintf('RRMSE_ratio_HistDataVSOpt_NDirs%i_%s',numDirs(iNDirs),  fname);
+    figName = sprintf('RRMSE_ratio_HistDataVSOpt_NDirs%i_%s_RECOMP',numDirs(iNDirs),  fname);
     fh  = figure('name',figName,'visible',figVisible,'color','w');
     xpatch = [.5 m.rrmse.x(iNDirs,  m.rrmse.x(iNDirs, :)<=1) 1];
     ypatch = m.rrmse.y(iNDirs,  m.rrmse.x(iNDirs, :)<=1);
@@ -244,7 +247,7 @@ for iNDirs = 1:size(m.rrmse.x,1)
     saveFig(fh,fullfile(saveDir, figName),1)
 end
 
-figName = sprintf('NFibers_hist_NDirs%i_%i_%i_%i_%i_%s',numDirs,  fname);
+figName = sprintf('NFibers_hist_NDirs%i_%i_%i_%i_%i_%s_RECOMP',numDirs,  fname);
 fh  = figure('name',figName,'visible',figVisible,'color','w');
 y = m.nfibers.y(:,1:length(numDirs))./500000;
 x = m.nfibers.x;

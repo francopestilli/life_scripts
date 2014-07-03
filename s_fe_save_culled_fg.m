@@ -38,7 +38,7 @@ for isbj = 1:length(subjects)
     if ~isempty(bval)
        feFiles       = dir(fullfile(fePath,sprintf('*%s*.mat',num2str(bval))));
     else
-       feFiles       = dir(fullfile(fePath,sprintf('*.mat')));
+       feFiles       = dir(fullfile(fePath,sprintf('*lmax10*_recomputed.mat')));
     end
             
     % We build one modelper fiber group, whole brain fiber group
@@ -64,18 +64,22 @@ for isbj = 1:length(subjects)
         goodFibers = w > 0;
         badFibers  = w == 0;
         results.weights = w;
+         
+        fprintf('[%s] Loading a FG: \n%s\n',mfilename,feFileName2Load)
+        if isempty(fe.fg)
+        fg = fgRead(fullfile(fibersSaveDir,[feFiles(iFe).name(1:end-15),'.pdb']));
+        else
+        fg = feGet(fe,'fibers acpc');
+        end
         clear fe
         
-        fprintf('[%s] Loading a FG: \n%s\n',mfilename,feFileName2Load)
-        fg = fgRead(fullfile(fibersSaveDir,[feFiles(iFe).name(1:end-3),'pdb']));
-               
         fprintf('[%s] Extracting fiber density and length of the candidate FG\n',mfilename)
         %results.candidate.density = dtiComputeFiberDensityNoGUI(fg,xformimg2acpc,mapsize);
         results.candidate.length  = cellfun(@length,fg.fibers); 
         results.candidate.n = length(w);
           
         fprintf('[%s] Extracting the optimized FG\n',mfilename)
-        fgB = fgExtract(fg,badFibers,'keep');   
+        fgB = fgExtract(fg,find(badFibers),'keep');   
        
         fprintf('[%s] Extracting fiber density and length of the rejected fibers\n',mfilename)
         %results.rejected.density = dtiComputeFiberDensityNoGUI(fgB,xformimg2acpc,mapsize);
@@ -86,7 +90,7 @@ for isbj = 1:length(subjects)
         clear fgB badFibers
 
         fprintf('[%s] Extracting the optimized FG\n',mfilename)
-        fgG = fgExtract(fg,goodFibers,'keep');        
+        fgG = fgExtract(fg,find(goodFibers),'keep');        
         clear fg
         fprintf('[%s] Extracting fiber density and length of the candidate FG\n',mfilename)
         %results.optimized.densityw = dtiComputeFiberDensityNoGUI(fgG,xformimg2acpc,mapsize,[],[],[],[],w);

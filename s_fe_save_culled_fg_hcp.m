@@ -1,4 +1,4 @@
-function s_fe_save_culled_fg_hcp(tractographyType,bval)
+function s_fe_save_culled_fg_hcp(bval,dataDir,which_subject,tractographyType)
 %
 % This function:
 %  - Load a series of precomputed connectomes (fe strucutres)
@@ -13,12 +13,47 @@ function s_fe_save_culled_fg_hcp(tractographyType,bval)
 
 % Get the base directory for the data
 % Get the base directory for the data
-datapath = '/marcovaldo/frk/2t2/HCP/';
-subjects = {'115320','117122','118730'};
-if notDefined('tractographyType'), tractographyType = 'lmax10'; end
-if notDefined('bval'), bval = []; end
+if notDefined('bval'); bval=2000;end
+if notDefined('dataDir'); dataDir='2t1';end
+if notDefined('tractographyType'); tractographyType='lmax10';end
 
-for isbj = 1:length(subjects)
+% Get the base directory for the data
+[~,hostname] = system('hostname');
+hostname = deblank(hostname);
+switch dataDir
+    case {'2t2'}
+        switch hostname
+            case {'marcovaldo'}
+                datapath = '/home/frk/2t2/HCP/';
+            otherwise
+                datapath = '/marcovaldo/frk/2t2/HCP/';
+                
+        end
+        subjects = {...
+            '115320', ...
+            '117122', ...
+            '118730', ...
+            };
+        
+    case {'2t1'}
+        switch hostname
+            case {'marcovaldo'}
+                datapath = '/home/frk/2t1/HCP/';
+            otherwise
+                datapath = '/marcovaldo/frk/2t1/HCP/';
+                
+        end
+        subjects = {...
+            '111312', ...
+            '113619', ...
+            '105115', ...
+            '110411', ...
+            };
+    otherwise
+        keyboard
+end
+
+for isbj = which_subject
     % Directory where to save the fibers and the results
     fibersSaveDir       = fullfile(datapath,subjects{isbj},'fibers');
     resultsSaveDir       = fullfile(datapath,subjects{isbj},'results');
@@ -27,7 +62,7 @@ for isbj = 1:length(subjects)
     fePath    = fullfile(datapath,subjects{isbj},'connectomes');
     
     if ~isempty(bval)
-       feFiles       = dir(fullfile(fePath,sprintf('*%s*.mat',num2str(tractographyType))));
+       feFiles       = dir(fullfile(fePath,sprintf('*%s*%s*cerebellum.mat',num2str(bval),num2str(tractographyType))));
     else
        feFiles       = dir(fullfile(fePath,sprintf('*.mat')));
     end
@@ -40,7 +75,11 @@ for isbj = 1:length(subjects)
         % Buil a full-file of the fibers and the FE structure
         feFileName2Load = fullfile(fePath,feFiles(iFe).name);
         fgGoodFileName = fullfile(fibersSaveDir,[feFileName,'-optimized.mat']); 
-        fgBadFileName = fullfile(fibersSaveDir,[feFileName,'-rejected.mat']);
+        fgGoodFileNameQNCH = fullfile(fibersSaveDir,[feFileName,'-optimized-QNCH.pdb']); 
+
+        fgBadFileName = fullfile(fibersSaveDir,[feFileName,'-rejected.mat']); 
+        fgBadFileNameQNCH = fullfile(fibersSaveDir,[feFileName,'-rejected-QNCH.pdb']);
+
         resultsFileName2Save = fullfile(resultsSaveDir,[feFileName,'-fiberStatsResults.mat']);
 
         % Initialize the Connectome
@@ -73,7 +112,10 @@ for isbj = 1:length(subjects)
         results.rejected.length  = cellfun(@length,fgB.fibers); 
         results.rejected.n = sum(badFibers);
         fprintf('[%s] Saving a Rejected FG: \n%s\n',mfilename,fgBadFileName)
-        fgWrite(fgB,fgBadFileName);
+        fgWrite(fgB,fgBadFileName); 
+        fgB.fibers = mbaFiberSplitLoops(fgB.fibers);
+        fgB.pathwayInfo=[];
+        fgWrite(fgB,fgBadFileNameQNCH,'pdb'); 
         clear fgB badFibers
 
         fprintf('[%s] Extracting the optimized FG\n',mfilename)
@@ -88,6 +130,9 @@ for isbj = 1:length(subjects)
         
         fprintf('[%s] Saving a Optimized FG: \n%s\n',mfilename,fgGoodFileName)
         fgWrite(fgG,fgGoodFileName);
+        fgG.fibers = mbaFiberSplitLoops(fgG.fibers);
+        fgG.pathwayInfo=[];
+        fgWrite(fgG,fgGoodFileNameQNCH,'pdb');
         clear fgG
         
         fprintf('[%s] Saving a Results: \n%s\n',mfilename,resultsFileName2Save)

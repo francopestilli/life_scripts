@@ -9,12 +9,12 @@ function s_ms_directions_hcp(trackingType)
 % Get the base directory for the data
 datapath{1} = '/marcovaldo/frk/2t1/HCP/';
 datapath{2} = '/marcovaldo/frk/2t2/HCP/';
-subjects = {'105115','110411','111312','113619','115320','117122','118730'};
+subjects = {'105115','111312','113619','115320','117122','118730'};
 addpath(genpath('/marcovaldo/frk/git/boot_dwi'))
 
 if notDefined('saveDir'), savedir = fullfile('/marcovaldo/frk/Dropbox','pestilli_etal_revision',mfilename);end
 if notDefined('trackingType'), trackingType = 'lmax10';end
-if notDefined('numDirs'), numDirs = [90,64,32,16,8];end
+if notDefined('numDirs'), numDirs = [90:-5:8];end
 
 doFD       = 1;
 figVisible = 'off';
@@ -31,7 +31,7 @@ for isbj = 1:length(subjects)
     
     % File to load   
     connectomesPath   = fullfile(datapath{dpathIdx},subjects{isbj},'connectomes');
-    feFileToLoad = dir(fullfile(connectomesPath,sprintf('*%s*left.mat',trackingType)));
+    feFileToLoad = dir(fullfile(connectomesPath,sprintf('*%s*both.mat',trackingType)));
     fname = feFileToLoad(probIndex).name(1:end-4);
     feFileToLoad = fullfile(connectomesPath,fname);
     fprintf('[%s] Loading: \n%s\n ======================================== \n\n',mfilename,feFileToLoad)
@@ -59,6 +59,10 @@ for isbj = 1:length(subjects)
             fe = feSet(fe,'fg from acpc',fgRead(fullfile(fiberPath,fibers.name)));
         end
         w       = feGet(fe,'fiber weights');
+        % Compute the total number of fibers retained at each direction number.
+        m.optimized.nfibers(iNumDirs,isbj) = sum(w > 0);
+        m.optimized.ndirs(iNumDirs,isbj)   = numDirs(iNumDirs);
+        
         numFibers_total(iNumDirs,isbj) = length(w);
         numFibers_good(iNumDirs,isbj)  = sum(w > 0);
         
@@ -122,6 +126,7 @@ for isbj = 1:length(subjects)
     m.density.candidate_median(iNumDirs,isbj)     = nanmedian(fdOImg(:));
     
     x = [1 2.^[1 2 3 4 5 6 7 8 9 10]];
+    x = [2:2:512];
     [yFD(iNumDirs,isbj,:), xFD(iNumDirs,isbj,:)]  = hist(fdImg(:),x);
      yFD(iNumDirs,isbj,:) = 100*yFD(iNumDirs,isbj,:)./sum(yFD(iNumDirs,isbj,:));
     [yoFD(iNumDirs,isbj,:),xoFD(iNumDirs,isbj,:)]= hist(fdOImg(:),x);
