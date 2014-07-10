@@ -1,7 +1,7 @@
 function s_fe_make_all_freesurfer_labels_into_rois(hemisphere)
 %
-% This script creates all the freesurfer lables from arcellation files and 
-% creates correspondign nifti and mat ROI compatible with mrDiffusion.
+% This script creates all the freesurfer lables from parcellation files and 
+% creates corresponding nifti and mat ROI compatible with mrDiffusion.
 %
 % Copyright by Franco Pestilli Stanford University 2014
 
