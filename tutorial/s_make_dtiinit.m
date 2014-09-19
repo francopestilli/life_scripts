@@ -1,16 +1,23 @@
-%% A script showing how to perform a virtual lesion
+%% s_make_dtiinit.m
 %
-% Processing steps:
-%  * The script starts with raw diffusion data
-%  * Passes it through the dtiInit preprocessing steps
-%  * Tracks using mrTrix
-%  * Uses AFQ to identify tracts of interest
-%  * Sets up a Life structure
+% This is the script used to create the data set in vistadata/life/data.
+%
+%  FP took a data set from Stanford at 1.5mm 96-directions from the LiFE
+%  paper and resampled to 4mm. 
+%  Purpose: Smaller data size.  This is in the raw/ directory.
+%
+%  Then he run dtiInit on the data and created the init log and the
+%  dti96trilin directory.  The additional files are produced by dtiInit as
+%  well.
 % 
+%  Then he ran mrTrix to create a whole-brain connectome.  He requested
+%  160K fibers and Lmax = 10, probabilistic.
 %
-% FP Vistasoft Lab, Stanford, 2014
+% MORE COMMENTS NEEDED AND FIX THE FILE REFERENCES SO THEY POINT TO
+% VISTADATA AND NOT STUFF IN /home/frk
+%
 
-%% Set the path and run dtiInit
+%% Resample
 
 % cube mm of the spatial resolution for the output diffusion data
 resolution = 4; 
@@ -25,11 +32,9 @@ if ~isempty(idx), res(2) ='p';end
 dwi_raw_file  = 'run01_fliprot_aligned_trilin';
 dt6_dir_name  = sprintf('dt6_%s_%smm',dwi_raw_file(1:14),res);
 %dataDir       = '/home/frk/2t1/HCP/105115_data_variability/';
-dataDir       = fullfile(mrvDataRootPath,'life');
+dataDir       = '/home/frk/2t1/fp96_data_variability/';
 dwRawFileName = fullfile(dataDir,dt6_dir_name, 'raw', sprintf('%s.nii.gz',dwi_raw_file));
-if ~exist(dwRawFileName,'file'), error('No dwRaw file %s',dwRawFileName); end
 t1FileName    = fullfile(dataDir,dt6_dir_name, 'anatomy','t1.nii.gz');
-if ~exist(t1FileName,'file'), error('No T1 File %s',t1FileNames); end
 
 % Initialization parameters
 dwp = dtiInitParams;
@@ -44,7 +49,7 @@ dwp.dt6BaseName = '';
 dwp.bvecsFile   = fullfile(dataDir,dt6_dir_name, 'raw',sprintf('%s.bvecs',dwi_raw_file));
 dwp.bvalsFile   = fullfile(dataDir,dt6_dir_name, 'raw',sprintf('%s.bvals',dwi_raw_file));
 
-% Run the preprocessing
+%% Run the preprocessing
 [dtFile, outBaseDir] = dtiInit(dwRawFileName, t1FileName, dwp);
 
 %% Run MRtrix tractography
@@ -56,12 +61,11 @@ nFascicles = 120000;
 toc
        
 %% Run AFQ
-
 % Segment the fibers using AFQ
 tic, [fg_classified,~,classification]= AFQ_SegmentFiberGroups(dt6_file, fg);
 toc
 
-%% Split the fiber groups into individual groups
+% Split the fiber groups into individual groups
 tic, fascicles = fg2Array(fg_classified);
 toc
 
@@ -72,20 +76,21 @@ for iif = 1:length(fascicles)
     fgWrite(fascicles(iif),    fullfile(afqFolder,[fascicles(iif).name,'_uncleaned']),'mat')
 end
 
-% Clean the fibers, we apply the same trhesholds to all fiber
+%% Clean the fibers
+% We apply the same trhesholds to all fiber
 % groups this is the default thrshold used by AFQ. This is done by
 % not passing opts
 tic, [fascicles1, classification] = feAfqRemoveFascicleOutliers(fascicles,classification);
 toc
 
-% Write the fascicles down to disk as independent files
+%% Write the fascicles down to disk as independent files
 tic, afqFolder = fullfile(dataDir,dt6_dir_name, 'AFQ');
 if ~exist(afqFolder,'dir'), mkdir(afqFolder); end
 for iif = 1:length(fascicles)
-    fgWrite(fascicles1(iif),    fullfile(afqFolder,fascicles(iif).name),'mat')
+fgWrite(fascicles1(iif),    fullfile(afqFolder,fascicles(iif).name),'mat')
 end
 
-% Save the segemented fascicles and the indices into the Mfiber
+% Save the segemented fascicles and the indicses into the Mfiber
 classFile2Save = fullfile(afqFolder,'tracts_classification_indices');
 save(classFile2Save,'fg_classified','classification','fascicles1')
 
@@ -97,4 +102,4 @@ if ~exist(feFolder,'dir'), mkdir(feFolder); end
 fe = feConnectomeInit(dwiFile,fg,feFileName,feFolder,dwiFile,t1FileName);
 fe = feSet(fe,'fit',feFitModel(feGet(fe,'mfiber'),feGet(fe,'dsigdemeaned'),'bbnnls'));
 
-% Perform a virtual lesion
+%% End
