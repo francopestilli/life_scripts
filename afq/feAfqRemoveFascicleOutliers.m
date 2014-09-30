@@ -23,7 +23,7 @@ function [fascicles classification] = feAfqRemoveFascicleOutliers(fascicles,clas
 
 % Parameters for the outliers removal process.
 if notDefined('opts')
-  opts.stdCutOff   = 3.5;   % Standard deviation fo the 3D gaussian distribution used to
+  opts.stdCutOff   = 4;   % Standard deviation fo the 3D gaussian distribution used to
   % represent the fascicle when removing outliers. 3.5 z-scores
   opts.maxLen      = 20;  % Max lenght of fibers to be accepted in cm
   opts.maxNumNodes = 100; % This is used only during the computations does not actually change the nodes

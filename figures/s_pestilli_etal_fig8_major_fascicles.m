@@ -2,7 +2,7 @@ function s_pestilli_etal_fig8_major_fascicles(whichSubject)
 %
 % load an plots the 20 major fascicles generated with AFQ
 %
-% Copyright Franco PEstilli 2014 Stanford University
+% Copyright Franco Pestilli 2014 Stanford University
 
 
 % Get the base directory for the data
@@ -77,7 +77,7 @@ function colors = getColors
 % % Prepare the colors for plotting, Left HM warm, Right HM cool
 % numColRes = 12;
 % allColors = 1:1:numColRes;
-% colormaps = {'spring','summer','autumn','winter','bone'};
+% colormaps = {'spri ng','summer','autumn','winter','bone'};
 % for iMap = 1:length(colormaps)
 % %figure(iMap)
 % for iFas  = 1:length(allColors)
