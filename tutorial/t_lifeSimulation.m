@@ -134,6 +134,10 @@ end
 %   In parallel_function>make_general_channel/channel_general at 870
 %   In remoteParallelFunction at 30 
 
+% Predict the diffusion including the tensor means.
+% In the typical evaluation scenario, we remove the means for fitting the
+% model.
+%
 zeroMean = false;
 fe = feConnectomeBuildModel(fe,zeroMean);
 fe = feSet(fe,'name','ForwardModel');
@@ -141,11 +145,12 @@ nVoxels = feGet(fe,'n voxels');
 v2fn = feGet(fe,'voxel 2 fn pair');
 
 % Xfrom fibers in IMG then find the index in the fe structure
-c = fe.fg.fibers{100};
-plot3(c(1,:),c(2,:),c(3,:),'-o')
+fibers = feGet(fe,'fibers img'); 
+c = uint16(floor(fibers.fibers{100}))';
+mrvNewGraphWin; plot3(c(:,1),c(:,2),c(:,3),'-o')
 
 % Find the index in the fe structure
-foundVoxels = feGet(fe,'find voxels',c');
+foundVoxels = feGet(fe,'find voxels',c);
 sub2ind(12,31,24)
 
 % These are the voxels in 'whichFiber'
