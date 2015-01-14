@@ -1,4 +1,4 @@
 life_scripts
 ============
 
-Scripts for the article under review by Pestilli et al.
+Diffusion imaging and tractogrpahy scripts.
