@@ -26,7 +26,7 @@
 %
 % After this the code below should work and walk thorught the main steps. 
 %
-% Copyright Franco Pestilli Indian University, pestillifranco@gmail.com
+% Copyright 2015 Franco Pestilli Indiana University, pestillifranco@gmail.com
 
 %% (0) Make sure the files are organized as necessary (file names are relative):
 %    <subject directory>
