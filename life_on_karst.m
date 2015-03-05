@@ -3,7 +3,7 @@
 feOpenLocalCluster;
 
 %% Name and locatio of result file to save
-file2save = fullpath(savePath,'life_on_karst_results.mat')
+file2save = fullfile(savePath,'life_on_karst_results.mat')
 
 %% Build the file names for the diffusion data, the anatomical MRI.
 dwiFile       = fullfile(lifeDemoDataPath('diffusion'),'life_demo_scan1_subject1_b2000_150dirs_stanford.nii.gz');
