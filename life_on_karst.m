@@ -54,4 +54,4 @@ prob.rrmse  = feGetRep(fe,'vox rmse ratio');
 % fascicle in the connectome.
 prob.w      = feGet(fe,'fiber weights');
 
-save(file2save,'prob','fe')
+save(file2save,'prob','fe','-v7.3')
