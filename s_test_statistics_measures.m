@@ -1,4 +1,4 @@
-function s_test_KL
+function s_test_statistics_measures
 % Test the variability of S and K-L or Jeffrey as function of:
 % - Effect size, namely he difference between the distribution of errors
 % with and without the lesion
